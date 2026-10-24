@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>延时回响 · 大地图编辑器（最大 100×100）</title>
+<style>
+  :root{
+    --ink:#4a4f63; --sub:#8c94a6; --line:#dfe4ee; --panel:#fbfbfe; --bg:#eef1f7;
+    --brick:#e8dfd0; --brick-bd:#cdc3b2; --spike:#c86a5a; --plank:#c99a63;
+    --door:#8d6e63; --sign:#efe9d9; --star:#e8b923; --exit:#63b37a; --spawn:#6b6488;
+    --sw-A:#8b81c0; --sw-B:#5fa39a; --sw-C:#c9a227;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    display:flex;flex-direction:column;overflow:hidden;color:var(--ink);background:var(--bg);
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",system-ui,-apple-system,sans-serif;
+  }
+  header{
+    flex:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);
+  }
+  header h1{font-size:15px;margin:0 6px 0 0;font-weight:600;letter-spacing:.5px}
+  header h1 small{font-weight:400;color:var(--sub);font-size:12px;margin-left:6px}
+  .grp{display:flex;align-items:center;gap:5px}
+  .grp+.grp{margin-left:4px;padding-left:10px;border-left:1px solid var(--line)}
+  label{font-size:12px;color:var(--sub)}
+  input[type=number]{width:56px;padding:3px 5px;font-size:12px;border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--ink)}
+  select,button{
+    font-family:inherit;font-size:12px;padding:4px 9px;border:1px solid var(--line);
+    border-radius:6px;background:#fff;color:var(--ink);cursor:pointer;
+  }
+  button:hover{background:#eef3fb}
+  button:active{transform:translateY(1px)}
+  button.on{background:#3f6fd8;border-color:#3f6fd8;color:#fff}
+  .hint{font-size:11px;color:var(--sub)}
+  #gameFile{font-weight:600;color:var(--ink);background:var(--panel2,#f4f6fa);
+           padding:3px 8px;border-radius:5px;border:1px solid var(--line,#dfe4ee)}
+  #lnkGame{font-size:12px;font-weight:600;color:#3f6fd8;text-decoration:underline;cursor:pointer}
+  #lnkGame:hover{color:#2b56b8}
+  .chk{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--ink);cursor:pointer;user-select:none}
+  .chk input{margin:0;cursor:pointer}
+  main{flex:1;display:flex;min-height:0}
+  aside{
+    flex:none;width:170px;overflow-y:auto;padding:8px 8px 20px;
+    background:var(--panel);border-right:1px solid var(--line);
+  }
+  aside h2{font-size:12px;color:var(--sub);margin:10px 0 5px;font-weight:600}
+  aside h2:first-child{margin-top:0}
+  .tool{display:flex;align-items:center;gap:7px;padding:4px 6px;border:1px solid transparent;border-radius:7px;cursor:pointer;user-select:none}
+  .tool:hover{background:#f2f5fa}
+  .tool.sel{border-color:#3f6fd8;background:#e8effc}
+  .tool .ic{
+    width:28px;height:28px;flex:none;position:relative;display:flex;align-items:center;justify-content:center;
+    background:#f6f8fb;border:1px solid var(--line);border-radius:5px;padding:2px;overflow:hidden;
+  }
+  .tool .nm{font-size:12px}
+  .tool .ch{color:var(--sub);font-size:11px;margin-left:auto;font-family:Consolas,monospace}
+  #mechbox{border-top:1px solid var(--line);margin-top:10px;padding-top:8px}
+  .mrow{display:flex;align-items:center;gap:5px;margin-bottom:4px;font-size:12px}
+  .mid{flex:none;width:26px;text-align:center;font:600 11px Consolas,monospace;color:#fff;background:#c99a63;border-radius:4px;padding:2px 0}
+  .mid.sw{background:#8b81c0}
+  .mid.pt{background:#6f7fc4}
+  .mpos{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--sub);font-size:11px}
+  .mbind{max-width:74px;font-size:11px;padding:2px}
+  .mdel{flex:none;padding:1px 6px;font-size:12px;line-height:1.3;color:#b06a3a}
+  .ic canvas{display:block}
+  .ic.txt{font-size:13px;font-weight:700;color:#5a6178;line-height:1}
+  section.stage{flex:1;position:relative;min-width:0;overflow:hidden}
+  canvas#cv{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair;display:block}
+  canvas#cv.pan{cursor:grab}
+  #status{
+    position:absolute;left:8px;bottom:8px;font:11px/1.6 Consolas,monospace;color:var(--ink);
+    background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:6px;padding:3px 8px;pointer-events:none;
+  }
+  #mini{
+    position:absolute;right:8px;bottom:8px;background:rgba(251,251,254,.96);
+    border:1px solid var(--line);border-radius:7px;box-shadow:0 2px 8px rgba(30,40,60,.14);cursor:crosshair;
+  }
+  footer{
+    flex:none;display:flex;align-items:stretch;gap:8px;padding:8px 12px;
+    background:var(--panel);border-top:1px solid var(--line);
+  }
+  #out{
+    flex:1;height:74px;resize:none;font:11px/1.5 Consolas,monospace;
+    border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:#fcfdff;color:var(--ink);
+  }
+  .side{flex:none;display:flex;flex-direction:column;gap:5px;justify-content:center}
+  #toast{
+    position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(8px);
+    background:rgba(52,58,74,.94);color:#fff;font-size:12px;padding:7px 14px;border-radius:8px;
+    opacity:0;transition:.18s;pointer-events:none;z-index:9;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  /* ---- 自定义图块管理弹窗 ---- */
+  .mask{position:fixed;inset:0;background:rgba(52,58,74,.45);display:flex;align-items:center;justify-content:center;z-index:20}
+  .mask.hidden{display:none}
+  .dlg{background:#fff;border:1px solid var(--line);border-radius:12px;width:640px;max-width:94vw;
+       max-height:88vh;overflow:auto;box-shadow:0 12px 40px rgba(30,40,60,.28)}
+  .dlg-h{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;
+         border-bottom:1px solid var(--line);font-size:14px;font-weight:600}
+  .dlg-h .x{cursor:pointer;color:var(--sub);font-size:19px;line-height:1;padding:0 4px;border:none;background:none}
+  .dlg-h .x:hover{color:#b06a3a;background:none}
+  .dlg-b{display:flex;gap:14px;padding:14px}
+  .blist{flex:none;width:172px;max-height:320px;overflow-y:auto;border-right:1px solid var(--line);padding-right:10px}
+  .bitem{display:flex;align-items:center;gap:6px;padding:4px 2px;border-radius:6px}
+  .bitem:hover{background:#f2f5fa}
+  .bitem canvas{flex:none;background:#f6f8fb;border:1px solid var(--line);border-radius:5px}
+  .bitem .bnm{flex:1;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bitem .bnm i{font-style:normal;color:var(--sub);font-family:Consolas,monospace;margin-left:4px;font-size:11px}
+  .bitem button{flex:none;padding:1px 7px;font-size:11px}
+  .bform{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+  .bform .prev{align-self:flex-start;background:#f6f8fb;border:1px solid var(--line);border-radius:8px;padding:4px}
+  .bform label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink)}
+  .bform label span{flex:none;width:34px;color:var(--sub)}
+  .bform input[type=text]{flex:1;padding:4px 7px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font-family:inherit}
+  .arts{display:flex;flex-wrap:wrap;gap:6px}
+  .art{width:52px;padding:4px 0 3px;text-align:center;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:#fff}
+  .art:hover{background:#f2f5fa}
+  .art.sel{border-color:#3f6fd8;background:#e8effc}
+  .art canvas{display:block;margin:0 auto;background:#f6f8fb;border-radius:4px}
+  .art span{display:block;font-size:11px;color:var(--ink);margin-top:2px}
+  .upline{display:flex;align-items:center;gap:8px}
+  .ops{display:flex;gap:8px;margin-top:2px}
+  .ops .pri{background:#3f6fd8;border-color:#3f6fd8;color:#fff}
+  .ops .pri:hover{background:#355ebc}
+  #blkDel{color:#b06a3a}
+  .hintbox{font-size:11px;color:var(--sub);line-height:1.7;padding:2px 4px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
+  .cols .cl{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink);cursor:pointer}
+  .cols input[type=color]{width:30px;height:22px;padding:0;border:1px solid var(--line);border-radius:4px;background:#fff;cursor:pointer}
+  .palette{display:flex;gap:6px;flex-wrap:wrap;min-height:24px}
+  .palette .sw{width:34px;height:22px;border-radius:4px;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>延时回响 · 大地图编辑器<small>最大 100×100 · 填充/矩形/取色 · 自定义图块 · 滚轮缩放 · 方向键/抓手移动</small></h1>
+  <div class="grp">
+    <label>宽</label><input type="number" id="inCols" min="2" max="100" value="40">
+    <label>高</label><input type="number" id="inRows" min="2" max="100" value="30">
+    <button id="btnResize">应用尺寸</button>
+  </div>
+  <div class="grp">
+    <button data-size="24,12">24×12</button>
+    <button data-size="40,30">40×30</button>
+    <button data-size="100,100">100×100</button>
+  </div>
+  <div class="grp">
+    <button id="btnUndo">撤销 Ctrl+Z</button>
+    <button id="btnClear">清空</button>
+    <button id="btnFit">全览</button>
+    <button id="btnPan">抓手（拖动画布）</button>
+    <button id="btnGrid" class="on">网格</button>
+    <button id="btnNo">编号</button>
+  </div>
+  <div class="grp">
+    <label class="chk" title="放开关时自动在正下方补一块上半砖当底座，避免摆出悬空开关">
+      <input type="checkbox" id="cbPedestal" checked> 开关自动补半砖底座
+    </label>
+  </div>
+  <!-- 不预置关卡：打开就是空白画布，交给使用者自由摆放 -->
+  <div class="grp">
+    <button id="btnSave">保存</button>
+    <button id="btnDownTxt" title="下载成 .txt 文本：用记事本就能打开，直接全选复制发给别人">下载 .txt（复制分享）</button>
+    <button id="btnSend" class="pri" title="把当前地图+主题+贴纸写进收件箱，并自动打开游戏，进游戏一键载入">发送到游戏 ▶</button>
+    <span class="hint" title="游戏网页的地址。部署后填完整网址（如 https://xxx.github.io/delayed-echo-game/），本地可填 ../delayed-echo-game/index.html；发送时会自动打开它">游戏页</span>
+    <input id="gameFile" type="text" spellcheck="false" style="width:280px;font-size:11.5px;padding:3px 6px;border:1px solid #d8dee4;border-radius:4px;background:#fff" placeholder="游戏网页地址（留空则不自动打开）">
+    <a id="lnkGame" class="hint" hidden title="浏览器拦截了新窗口，点这里手动打开游戏"></a>
+    <span id="savedAt" class="hint"></span>
+  </div>
+</header>
+
+<main>
+  <aside id="tools"></aside>
+  <section class="stage">
+    <canvas id="cv"></canvas>
+    <canvas id="mini" width="176" height="176" title="缩略导航：点击/拖动可跳转视口"></canvas>
+    <div id="status"></div>
+  </section>
+</main>
+
+<footer>
+  <textarea id="out" spellcheck="false" placeholder="导出的 var MAP（+ MECH + BLOCKS + THEME）会出现在这里；也可以把导出的整段文本粘进来点「导入」"></textarea>
+  <div class="side">
+    <button id="btnExport">导出 MAP</button>
+    <button id="btnCopy">复制</button>
+    <button id="btnImport">导入</button>
+  </div>
+</footer>
+
+<!-- 自定义图块管理弹窗：起名 + 写注释 + 选样子（内置图形或上传图片） -->
+<div id="blkModal" class="mask hidden">
+  <div class="dlg">
+    <div class="dlg-h">自定义图块（贴纸）<button class="x" id="blkClose" title="关闭">×</button></div>
+    <div class="dlg-b">
+      <div class="blist" id="blkList"></div>
+      <div class="bform">
+        <div class="prev"><canvas id="blkPrev" width="112" height="112"></canvas></div>
+        <label><span>名称</span><input type="text" id="blkName" maxlength="12" placeholder="比如：宝藏标记"></label>
+        <label><span>注释</span><input type="text" id="blkNote" maxlength="40" placeholder="这个图块是干嘛的（可选）"></label>
+        <div class="arts" id="blkArts"></div>
+        <div class="upline">
+          <button id="blkUp">上传图片</button>
+          <span class="hint">不想要内置样子就上传自己的图（自动缩到 64×64）</span>
+        </div>
+        <div class="ops">
+          <button id="blkSave" class="pri">保存</button>
+          <button id="blkDel">删除</button>
+          <button id="blkCancel">取消</button>
+        </div>
+        <div class="hintbox">图块会分配一个地图字符，放在地图里当「贴纸」用：<b>不挡路、不影响跳跃和机关</b>，纯粹做标记和装饰。定义随地图导出（var BLOCKS），贴到游戏里就能显示。</div>
+      </div>
+    </div>
+  </div>
+</div>
+<input type="file" id="blkFile" accept="image/*" hidden>
+
+<!-- 地图风格（主题）管理弹窗：导入参考图提色板 / 预设主题 / 逐元素调色 -->
+<div id="thModal" class="mask hidden">
+  <div class="dlg">
+    <div class="dlg-h">地图风格（主题）<button class="x" id="thClose" title="关闭">×</button></div>
+    <div class="dlg-b">
+      <div class="blist" id="thList"></div>
+      <div class="bform">
+        <div class="prev"><canvas id="thPrev" width="112" height="112"></canvas></div>
+        <label><span>名称</span><input type="text" id="thName" maxlength="12" placeholder="比如：暗夜森林"></label>
+        <div class="upline">
+          <button id="thUp">导入参考图</button>
+          <span class="hint">传自己游戏的截图，自动提取配色（可多选）</span>
+        </div>
+        <div class="palette" id="thPalette"></div>
+        <div class="cols" id="thCols"></div>
+        <div class="ops">
+          <button id="thSave" class="pri">保存为主题</button>
+          <button id="thApply">应用到地图</button>
+          <button id="thDel">删除</button>
+        </div>
+        <div class="hintbox">主题 = 一整套配色（砖/刺/桥/木/门/钥匙/开关/背景…）。<b>随地图导出</b>（var THEME），
+        别人导入你的地图就连风格一起拿到；游戏里不贴 THEME 则用默认米白，不影响老地图。</div>
+      </div>
+    </div>
+  </div>
+</div>
+<input type="file" id="thFile" accept="image/*" hidden>
+
+<div id="toast"></div>
+
+<script>
+/* =====================================================================
+   大地图编辑器（Canvas 版）
+   为什么要另开一版：20×18 那版是 DOM 网格（每格一个 div + 编号 + 坐标），
+   100×100 = 1 万个节点会直接卡死。这里改成 Canvas：只画可视区，缩放/平移流畅。
+   地图数据与导出格式与旧版、与游戏 index.html 完全一致（行字符串数组，行 0 = 顶部）。
+   ===================================================================== */
+
+/* ---------------- 工具与常量 ---------------- */
+var TOOLS = [
+  { g:'地形', items:[
+    { ch:'#', name:'整砖'   }, { ch:'-', name:'上半砖' },
+    { ch:'=', name:'下半砖' }, { ch:'^', name:'尖刺'   },
+    { ch:'~', name:'断桥'   },
+  ]},
+  { g:'机关', items:[
+    { ch:'E', name:'木板（自动编号）' }, { ch:'A', name:'开关（自动编号）' },
+    { ch:'D', name:'机关门' }, { ch:'1', name:'传送门（自动配对）' },
+  ]},
+  { g:'收集', items:[
+    { ch:'K', name:'钥匙'   }, { ch:'G', name:'星星'   },
+  ]},
+  { g:'其他', items:[
+    { ch:'S', name:'告示牌' },
+    { ch:'X', name:'出口'   }, { ch:'P', name:'出生点' },
+  ]},
+];
+/* 说明：木板统一用 E、开关统一用 A —— 支持任意多个，编号与"开关控制谁"记在 MECH 表里，
+   随地图一起导出。旧地图（A/B/C/E/F）导入时会自动编号并按旧规则绑定。 */
+var UNIQ = 'PXD';                   // 唯一性角色：放第二个自动移除第一个
+var KEY  = 'delayed_echo_editor_big_v2';   // 升版本 = 打开即空白；之后自动存回这里
+
+/* ---------------- 自定义图块（贴纸） ----------------
+   使用者可以自己加图块：选内置图形或上传图片，起名 + 写注释。
+   每个图块自动分配一个「没被游戏占用」的地图字符，往地图里一放就是一枚贴纸：
+   纯装饰，不挡路、不影响跳跃与机关。定义随地图导出（var BLOCKS = [...]）。 */
+var ARTS = [                        // 内置图形 20 种（与游戏内 drawArtShape 同一套画法）
+  { id:'square',   name:'方块' }, { id:'triangle', name:'三角' },
+  { id:'circle',   name:'圆点' }, { id:'star',     name:'星星' },
+  { id:'ladder',   name:'梯子' }, { id:'arrow',    name:'箭头' },
+  { id:'flag',     name:'旗子' }, { id:'heart',    name:'爱心' },
+  { id:'coin',     name:'金币' }, { id:'gem',      name:'宝石' },
+  { id:'cloud',    name:'云朵' }, { id:'tree',     name:'树' },
+  { id:'house',    name:'房子' }, { id:'chest',    name:'宝箱' },
+  { id:'potion',   name:'药水' }, { id:'shield',   name:'盾牌' },
+  { id:'sword',    name:'剑' },   { id:'crown',    name:'皇冠' },
+  { id:'mushroom', name:'蘑菇' }, { id:'fish',     name:'鱼' },
+];
+var USED_CHARS = '#-=^~.*T_v_ABCDEFGKPSX123456789 ';   // 游戏已占用的字符（图块字符绝不占用这些）
+var BLOCK_POOL = '$%&+?:;<>()[]{}|!/@"abcdefghijklmnopqrstuvwxyz';   // 图块字符池（46 个）
+var BLOCKS = [];                    // 图块定义 [{ch,name,note,art,img}]
+var BKEY   = 'delayed_echo_blocks_v1';                 // 图块库单独存（换地图不丢）
+var IMGC   = {};                    // dataURL → Image 缓存（上传图/预览共用）
+function blockAt(ch){ for (var i = 0; i < BLOCKS.length; i++) if (BLOCKS[i].ch === ch) return BLOCKS[i]; return null; }
+function nextBlockChar(){
+  var used = {}; for (var i = 0; i < BLOCKS.length; i++) used[BLOCKS[i].ch] = 1;
+  for (var j = 0; j < BLOCK_POOL.length; j++) if (!used[BLOCK_POOL[j]]) return BLOCK_POOL[j];
+  return null;
+}
+
+/* ---------------- 主题（风格）系统 ----------------
+   泛用化的关键：别人拿一张自己游戏的截图，就能提取出一整套配色，
+   砖/刺/桥/木/门/钥匙/开关全部跟着变。主题随地图导出（var THEME），
+   导入地图连风格一起拿到；不贴 THEME 的游戏用默认米白，老地图零影响。 */
+var THEME_DEFAULT = {           // 默认「米白」，= 现有游戏配色，改字段先同步这里
+  name:'米白', bg:'#f2f5fa', brick:'#e8dfd0', brickTop:'#f7f3ea', brickSide:'#cfc6b8',
+  brickLine:'#968e80', spike:'#c86a5a', bridge:'#b9c3d4', wood:'#a98d68',
+  door:'#b4adc1', key:'#e0b93c', switch_:'#8b81c0', portal:'#6f7fc4', goal:'#63b37a'
+};
+var THEME_PRESETS = [           // 预设主题：零门槛换风格
+  { name:'米白',   bg:'#f2f5fa', brick:'#e8dfd0', brickTop:'#f7f3ea', brickSide:'#cfc6b8', brickLine:'#968e80',
+    spike:'#c86a5a', bridge:'#b9c3d4', wood:'#a98d68', door:'#b4adc1', key:'#e0b93c', switch_:'#8b81c0', portal:'#6f7fc4', goal:'#63b37a' },
+  { name:'暗夜',   bg:'#1c2130', brick:'#3a4358', brickTop:'#4c5872', brickSide:'#2c3446', brickLine:'#161b28',
+    spike:'#d96a6a', bridge:'#5a6a8c', wood:'#8a6f52', door:'#565f7a', key:'#e8b923', switch_:'#7f9fd8', portal:'#8fa8dd', goal:'#63b37a' },
+  { name:'霓虹',   bg:'#101425', brick:'#232a45', brickTop:'#2e3860', brickSide:'#1a1f36', brickLine:'#0d1120',
+    spike:'#e24b6a', bridge:'#3d6ea8', wood:'#7a5f9a', door:'#3a4470', key:'#f0d048', switch_:'#3fd8e8', portal:'#b44fe8', goal:'#3fe89a' },
+  { name:'像素绿野', bg:'#e8f0d8', brick:'#8fbf6f', brickTop:'#a8d189', brickSide:'#6a9a52', brickLine:'#4a7a3a',
+    spike:'#c86a5a', bridge:'#a08a68', wood:'#8a6f52', door:'#7a8a9a', key:'#e8b923', switch_:'#6f9fd8', portal:'#8f7fd8', goal:'#e85a5a' }
+];
+var THEME_KEYS = [                // 可调色字段（顺序 = 面板排列）
+  ['bg','画布/背景'], ['brick','砖块'], ['brickTop','砖顶面'], ['brickSide','砖侧面'],
+  ['brickLine','砖缝线'], ['spike','尖刺'], ['bridge','断桥'], ['wood','木板'],
+  ['door','机关门'], ['key','钥匙/星星'], ['switch_','开关'], ['portal','传送门'], ['goal','出口']
+];
+var TH = {};                      // 当前主题（深拷贝自 THEME_DEFAULT）
+var TKEY = 'delayed_echo_themes_v1';               // 主题库 localStorage 键
+var THEMES = [];                  // 用户保存的主题
+(function(){ for (var k in THEME_DEFAULT) TH[k] = THEME_DEFAULT[k]; })();
+
+/* 颜色助手：主题字段全部存 hex，用到透明/深浅的地方现场转换 */
+function TA(col, a){              // hex → rgba(col, a)
+  var h = String(col || '#000').replace('#', '');
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  var n = parseInt(h, 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+function dark(col, k){            // 混黑（木纹深色、门下沿）
+  var h = String(col || '#000').replace('#', '');
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  var n = parseInt(h, 16);
+  return 'rgb(' + Math.round(((n >> 16) & 255) * (1 - k)) + ',' + Math.round(((n >> 8) & 255) * (1 - k))
+       + ',' + Math.round((n & 255) * (1 - k)) + ')';
+}
+function light(col, k){           // 混白（高光）
+  var h = String(col || '#000').replace('#', '');
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  var n = parseInt(h, 16);
+  return 'rgb(' + Math.round(((n >> 16) & 255) + (255 - ((n >> 16) & 255)) * k) + ','
+       + Math.round(((n >> 8) & 255) + (255 - ((n >> 8) & 255)) * k) + ','
+       + Math.round((n & 255) + (255 - (n & 255)) * k) + ')';
+}
+
+/* 不预置地图：编辑器启动即空白画布（40×30），由使用者自由从零摆放。 */
+
+/* ---------------- 状态 ---------------- */
+var COLS = 40, ROWS = 30;            // 默认空白画布（顶部输入框 / 预设按钮可改）
+var grid = [];                      // grid[r][c]，行 0 = 顶部
+var cur = '#';                      // 当前画笔
+var scale = 12;                     // 每格像素
+var camX = 0, camY = 0;             // 画布左上角对应的世界像素坐标
+var showGrid = true, showNo = false;
+var hoverC = -1, hoverR = -1;
+var painting = false, paintBtn = 0, panning = false, panSX = 0, panSY = 0;
+var panMode = false;                    // 抓手模式：左键拖即平移（不用按住空格）
+var mode = 'paint';                     // 左键行为：paint 画笔 / fill 油漆桶 / rect 矩形 / pick 取色
+var recting = false, rectStart = null, rectEnd = null;   // 矩形工具拖拽中
+var stroke = null;                  // 当前这一笔的改动（用于撤销）
+var undoStack = [];
+
+/* ---------------- DOM ---------------- */
+function $(id){ return document.getElementById(id); }
+var cv = $('cv'), ctx = cv.getContext('2d');
+var stage = cv.parentNode;
+function toast(m){
+  var t = $('toast'); t.textContent = m; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(function(){ t.classList.remove('show'); }, 1400);
+}
+function blankGrid(c, r){
+  grid = [];
+  for (var i = 0; i < r; i++){ var row = []; for (var j = 0; j < c; j++) row.push('.'); grid.push(row); }
+}
+
+/* ---------------- 工具面板（图标也画成小 canvas，与画布外观一致） ---------------- */
+function drawGlyph(c2, ch, s){
+  var g = c2.getContext('2d');
+  g.clearRect(0, 0, s, s);
+  if (ch === '__theme'){                      // 主题图标：四色色板
+    var cols = [TH.brick, TH.spike, TH.bridge, TH.goal];
+    for (var i = 0; i < 4; i++){
+      g.fillStyle = cols[i];
+      g.fillRect(2 + (i % 2) * 11, 2 + Math.floor(i / 2) * 11, 9, 9);
+    }
+    return;
+  }
+  g.save(); g.translate((s - 24) / 2, (s - 24) / 2);   // 内容按 24px 设计，居中放
+  paintTile(g, ch, 0, 0, 24);
+  g.restore();
+}
+function escHtml(s){
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+           .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function escAttr(s){                      // 导出进单引号字符串：转义反斜杠 / 单引号 / 换行
+  return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+           .replace(/[\r\n]+/g, ' ');
+}
+function buildTools(){
+  var box = $('tools'), html = '';
+  TOOLS.forEach(function(grp){
+    html += '<h2>' + grp.g + '</h2>';
+    grp.items.forEach(function(t){
+      html += '<div class="tool' + (t.ch === cur ? ' sel' : '') + '" data-ch="' + t.ch + '">'
+            + '<span class="ic"><canvas width="28" height="28" data-g="' + t.ch + '"></canvas></span>'
+            + '<span class="nm">' + t.name + '</span><span class="ch">' + t.ch + '</span></div>';
+    });
+  });
+  /* 自定义图块：自己加的贴纸 —— 新建/编辑都走弹窗；双击某枚图块可直接改它 */
+  html += '<h2>自定义图块</h2>'
+        + '<div class="tool" data-blk="new" title="新建一枚贴纸：选样子、起名、写注释">'
+        + '<span class="ic txt">＋</span><span class="nm">新建图块…</span></div>';
+  if (!BLOCKS.length) html += '<div class="hint" style="padding:0 6px 4px">还没有自定义图块</div>';
+  BLOCKS.forEach(function(b){
+    html += '<div class="tool' + (b.ch === cur ? ' sel' : '') + '" data-ch="' + b.ch + '" title="'
+          + escHtml(b.name + (b.note ? '——' + b.note : '') + '（双击编辑）') + '">'
+          + '<span class="ic"><canvas width="28" height="28" data-g="' + b.ch + '"></canvas></span>'
+          + '<span class="nm">' + escHtml(b.name) + '</span><span class="ch">' + b.ch + '</span></div>';
+  });
+  html += '<h2>擦除</h2><div class="tool" data-ch="."><span class="ic">'
+        + '<canvas width="28" height="28" data-g="."></canvas></span>'
+        + '<span class="nm">橡皮擦</span><span class="ch">.</span></div>';
+  /* 地图风格：导入参考图提色板 / 预设主题 / 逐元素调色 */
+  html += '<h2>地图风格</h2>'
+        + '<div class="tool" data-th="mgr" title="换整套配色：可导入自己游戏的截图自动提取">'
+        + '<span class="ic"><canvas width="28" height="28" data-g="__theme"></canvas></span>'
+        + '<span class="nm" id="thCurName">主题：' + escHtml(TH.name || '默认') + '</span></div>';
+  // 编辑模式：不改变画笔，只改变左键行为（油漆桶 / 矩形 / 取色）
+  html += '<h2>编辑</h2>'
+        + '<div class="tool' + (mode === 'fill' ? ' sel' : '') + '" data-mode="fill">'
+        + '<span class="ic txt">填</span><span class="nm">油漆桶</span><span class="ch">F</span></div>'
+        + '<div class="tool' + (mode === 'rect' ? ' sel' : '') + '" data-mode="rect">'
+        + '<span class="ic txt">框</span><span class="nm">矩形（Shift 填实）</span><span class="ch">R</span></div>'
+        + '<div class="tool' + (mode === 'pick' ? ' sel' : '') + '" data-mode="pick">'
+        + '<span class="ic txt">吸</span><span class="nm">取色</span><span class="ch">I</span></div>';
+  box.innerHTML = '<div id="mechbox"></div>' + html;   // 装置面板放顶部：一放装置就能设绑定，不用往下滚
+  refreshGlyphs();
+}
+function refreshGlyphs(){                // 只重画工具栏里的小图标（上传的图片加载完会用到）
+  var box = $('tools'); if (!box) return;
+  box.querySelectorAll('canvas[data-g]').forEach(function(c2){ drawGlyph(c2, c2.dataset.g, 28); });
+}
+function refreshSel(){
+  var box = $('tools'); if (!box) return;
+  box.querySelectorAll('.tool').forEach(function(x){
+    var on;
+    if (x.dataset.mode === undefined) on = (mode === 'paint' && x.dataset.ch === cur);
+    else on = (x.dataset.mode === mode);
+    x.classList.toggle('sel', on);
+  });
+}
+function selectTool(ch){
+  cur = ch; mode = 'paint'; refreshSel(); renderMech();
+}
+function selectMode(m){
+  mode = m; refreshSel();
+  if (m === 'fill') toast('油漆桶：点一格，把同色相连的区域一次填成当前画笔');
+  else if (m === 'rect') toast('矩形：拖拽画框，默认描边；按住 Shift 填实');
+  else if (m === 'pick') toast('取色：点一格，把它设为当前画笔（自动切回画笔）');
+}
+
+/* ---------------- 自定义图块管理弹窗 ---------------- */
+var blkEdit = null, blkArt = 'star', blkImg = null;   // 正在编辑的图块 / 选中的外观 / 上传的图片
+function openBlkMgr(edit){
+  blkEdit = edit || null;
+  blkArt  = (edit && edit.art) || 'star';
+  blkImg  = edit ? edit.img : null;
+  $('blkName').value = edit ? edit.name : '';
+  $('blkNote').value = edit ? edit.note : '';
+  $('blkDel').style.display = edit ? '' : 'none';
+  renderBlkArts(); renderBlkList(); drawBlkPrev();
+  $('blkModal').classList.remove('hidden');
+  if (!edit) setTimeout(function(){ $('blkName').focus(); }, 30);
+}
+function closeBlkMgr(){ $('blkModal').classList.add('hidden'); }
+function renderBlkArts(){                    // 外观选择：内置图形 + （有上传图时）图片项
+  var box = $('blkArts'), html = '';
+  if (blkImg)
+    html += '<div class="art sel" data-art="img" title="已上传的图片">'
+         + '<canvas width="40" height="40"></canvas><span>图片</span></div>';
+  ARTS.forEach(function(a){
+    html += '<div class="art' + (!blkImg && blkArt === a.id ? ' sel' : '') + '" data-art="' + a.id + '" title="' + a.name + '">'
+         + '<canvas width="40" height="40"></canvas><span>' + a.name + '</span></div>';
+  });
+  box.innerHTML = html;
+  box.querySelectorAll('.art').forEach(function(t){
+    var c2 = t.querySelector('canvas'), g = c2.getContext('2d');
+    var img = (t.dataset.art === 'img') ? blkImg : null;
+    drawArt(g, { art:(t.dataset.art === 'img' ? 'square' : t.dataset.art), img:img }, 0, 0, 40);
+  });
+}
+function renderBlkList(){                    // 左边：已有图块列表（可编辑）
+  var box = $('blkList'), html = '';
+  if (!BLOCKS.length){
+    html = '<div class="hintbox">还没有自定义图块。<br>起个名、选个样子，<br>保存后左边工具栏就能直接选。</div>';
+  }
+  BLOCKS.forEach(function(b){
+    html += '<div class="bitem" data-ch="' + b.ch + '">'
+         + '<canvas width="30" height="30"></canvas>'
+         + '<span class="bnm">' + escHtml(b.name) + '<i>' + b.ch + '</i></span>'
+         + '<button data-edit="' + b.ch + '">编辑</button></div>';
+  });
+  box.innerHTML = html;
+  box.querySelectorAll('.bitem').forEach(function(row){
+    var b = blockAt(row.dataset.ch);
+    if (b) drawArt(row.querySelector('canvas').getContext('2d'), b, 1, 1, 28);
+  });
+}
+function drawBlkPrev(){                      // 大预览：按当前选中的样子画
+  var c2 = $('blkPrev'), g = c2.getContext('2d');
+  g.clearRect(0, 0, 112, 112);
+  g.fillStyle = '#f6f8fb'; g.fillRect(0, 0, 112, 112);
+  g.strokeStyle = 'rgba(120,132,156,.3)';
+  for (var i = 1; i < 4; i++){               // 淡淡的 2×2 格底纹，示意"占一格"
+    g.beginPath(); g.moveTo(i * 28, 0); g.lineTo(i * 28, 112);
+    g.moveTo(0, i * 28); g.lineTo(112, i * 28); g.stroke();
+  }
+  drawArt(g, { art:blkArt, img:blkImg }, 4, 4, 104);
+}
+function saveBlk(){
+  var name = $('blkName').value.trim() || '图块';
+  var note = $('blkNote').value.trim();
+  if (blkEdit){
+    blkEdit.name = name; blkEdit.note = note;
+    blkEdit.art = blkArt; blkEdit.img = blkImg;
+    toast('已保存「' + name + '」');
+    blkEdit = null; $('blkDel').style.display = 'none';
+    $('blkName').value = ''; $('blkNote').value = '';
+    blkImg = null; blkArt = 'star';
+    renderBlkArts(); renderBlkList(); drawBlkPrev();
+  } else {
+    var ch = nextBlockChar();
+    if (!ch){ toast('字符池用完了（最多 ' + BLOCK_POOL.length + ' 个图块）'); return; }
+    BLOCKS.push({ ch:ch, name:name, note:note, art:blkArt, img:blkImg });
+    toast('已添加「' + name + '」（地图字符 ' + ch + '）');
+    blkImg = null; blkArt = 'star';
+    $('blkName').value = ''; $('blkNote').value = '';
+    renderBlkArts(); renderBlkList(); drawBlkPrev();
+  }
+  persistBlocks(); buildTools(); renderMech(); draw();
+}
+function delBlk(b){
+  var n = 0;
+  for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++)
+    if (grid[r][c] === b.ch){ grid[r][c] = '.'; n++; }
+  BLOCKS.splice(BLOCKS.indexOf(b), 1);
+  if (cur === b.ch) cur = '#';
+  persistBlocks(); buildTools(); renderMech(); draw(); save();
+  toast(n ? ('已删除「' + b.name + '」，地图上 ' + n + ' 个格子已清空') : ('已删除「' + b.name + '」'));
+  blkEdit = null; $('blkDel').style.display = 'none';
+  renderBlkList();
+}
+function persistBlocks(){
+  try { localStorage.setItem(BKEY, JSON.stringify(BLOCKS)); }
+  catch (e){ toast('图块保存失败：浏览器存储不可用'); }
+}
+function loadBlocks(){
+  try {
+    var d = JSON.parse(localStorage.getItem(BKEY));
+    if (d && d.length) BLOCKS = d.filter(function(b){ return b && b.ch && b.art; });
+  } catch (e){}
+}
+/* 上传图片：读文件 → 画到 64×64 画布（居中contain）→ dataURL，省存储也够清晰 */
+function bindBlkUI(){
+  $('tools').addEventListener('click', function(e){
+    var el = e.target.closest('.tool'); if (!el) return;
+    if (el.dataset.blk === 'new'){ openBlkMgr(null); return; }
+    if (el.dataset.th === 'mgr'){ openThMgr(null); return; }
+    if (el.dataset.mode) selectMode(el.dataset.mode);
+    else if (el.dataset.ch !== undefined) selectTool(el.dataset.ch);
+  });
+  $('tools').addEventListener('dblclick', function(e){
+    var el = e.target.closest('.tool'); if (!el) return;
+    var b = el.dataset.ch ? blockAt(el.dataset.ch) : null;
+    if (b) openBlkMgr(b);
+  });
+  $('blkArts').addEventListener('click', function(e){
+    var t = e.target.closest('.art'); if (!t) return;
+    if (t.dataset.art !== 'img'){ blkImg = null; blkArt = t.dataset.art; }
+    renderBlkArts(); drawBlkPrev();
+  });
+  $('blkList').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-edit]'); if (!btn) return;
+    var b = blockAt(btn.dataset.edit);
+    if (b) openBlkMgr(b);
+  });
+  $('blkSave').onclick = saveBlk;
+  $('blkCancel').onclick = closeBlkMgr;
+  $('blkClose').onclick = closeBlkMgr;
+  $('blkDel').onclick = function(){ if (blkEdit){ delBlk(blkEdit); } };
+  $('blkUp').onclick = function(){ $('blkFile').click(); };
+  $('blkFile').onchange = function(){
+    var f = this.files && this.files[0]; this.value = '';
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function(){
+      var im = new Image();
+      im.onload = function(){
+        var cc = document.createElement('canvas'); cc.width = 64; cc.height = 64;
+        var g = cc.getContext('2d');
+        var k = Math.min(64 / im.width, 64 / im.height);
+        var w = Math.max(1, Math.round(im.width * k)), h = Math.max(1, Math.round(im.height * k));
+        g.drawImage(im, (64 - w) / 2, (64 - h) / 2, w, h);
+        blkImg = cc.toDataURL('image/png');
+        renderBlkArts(); drawBlkPrev();
+        toast('图片已就绪（64×64）');
+      };
+      im.onerror = function(){ toast('图片读取失败，换一张试试'); };
+      im.src = rd.result;
+    };
+    rd.onerror = function(){ toast('文件读取失败'); };
+    rd.readAsDataURL(f);
+  };
+}
+
+/* ---------------- 装置绑定面板：木板列表 + 每个开关的"控制谁"下拉 ---------------- */
+function renderMech(){
+  var box = $('mechbox'); if (!box) return;
+  var woods = MECHS.filter(function(m){ return m.type === 'wood'; });
+  var sws   = MECHS.filter(function(m){ return m.type === 'switch'; });
+  var prts  = portalPairs();
+  var h = '<h2>装置绑定（' + woods.length + ' 木板 / ' + sws.length + ' 开关 / '
+        + prts.length + ' 传送门对 / 钥匙 ' + countKeys() + '）</h2>';
+  if (!woods.length && !sws.length && !prts.length){ box.innerHTML = ''; return; }   // 没有装置就不占位
+  woods.forEach(function(m){
+    h += '<div class="mrow"><span class="mid">' + m.id + '</span>'
+       + '<span class="mpos">木板 (' + m.c + ',' + m.r + ')</span>'
+       + '<button class="mdel" data-del="' + m.id + '">×</button></div>';
+  });
+  prts.forEach(function(p){
+    h += '<div class="mrow"><span class="mid pt">' + p.id + '</span><span class="mpos">传送门 '
+       + p.ends.map(function(e){ return '(' + e.c + ',' + e.r + ')'; }).join(' ↔ ')
+       + (p.ends.length === 2 ? '' : '　还差一端') + '</span></div>';
+  });
+  function opts(sel){
+    var o = '<option value="">未绑定</option>';
+    woods.forEach(function(w){ o += '<option value="' + w.id + '"' + (sel === w.id ? ' selected' : '') + '>' + w.id + '</option>'; });
+    prts.forEach(function(p){ o += '<option value="' + p.id + '"' + (sel === p.id ? ' selected' : '') + '>' + p.id + ' 传送门</option>'; });
+    o += '<option value="door"' + (sel === 'door' ? ' selected' : '') + '>机关门</option>';
+    return o;
+  }
+  sws.forEach(function(m){
+    h += '<div class="mrow"><span class="mid sw">' + m.id + '</span>'
+       + '<span class="mpos">(' + m.c + ',' + m.r + ')</span>'
+       + '<select class="mbind" data-id="' + m.id + '">' + opts(m.bind)
+       + '</select><button class="mdel" data-del="' + m.id + '">×</button></div>';
+  });
+  if (sws.length){
+    h += '<div class="mrow"><span class="mpos">新开关默认控制</span>'
+       + '<select id="newBindSel">' + opts(newBind) + '</select></div>';
+  }
+  box.innerHTML = h;
+  box.querySelectorAll('.mbind').forEach(function(sel){
+    sel.onchange = function(){
+      var m = null; for (var i = 0; i < MECHS.length; i++) if (MECHS[i].id === sel.dataset.id) m = MECHS[i];
+      if (m) m.bind = sel.value;
+      save(); toast(m ? (m.id + ' → ' + (sel.value || '未绑定')) : '');
+    };
+  });
+  var nb = $('newBindSel');
+  if (nb) nb.onchange = function(){ newBind = nb.value; };
+  box.querySelectorAll('.mdel').forEach(function(b){
+    b.onclick = function(){
+      for (var i = 0; i < MECHS.length; i++)
+        if (MECHS[i].id === b.dataset.del){
+          grid[MECHS[i].r][MECHS[i].c] = '.'; delMech(MECHS[i].c, MECHS[i].r); break;
+        }
+      miniDirty = true; draw(); save(); renderMech();
+    };
+  });
+}
+
+/* ---- 自定义图块的画法：内置图形（与游戏内 drawArtShape 保持一致） ---- */
+function drawArtShape(g, art, x, y, s){
+  var cx = x + s / 2, cy = y + s / 2, i, a, rr, px2, py2;
+  if (art === 'square'){                            // 方块
+    g.fillStyle = '#8fa8dd'; g.fillRect(x + s * .18, y + s * .18, s * .64, s * .64);
+    g.strokeStyle = 'rgba(60,80,130,.5)'; g.lineWidth = Math.max(1, s * .06);
+    g.strokeRect(x + s * .18, y + s * .18, s * .64, s * .64);
+    g.fillStyle = 'rgba(255,255,255,.32)'; g.fillRect(x + s * .18, y + s * .18, s * .64, s * .12);
+  } else if (art === 'triangle'){                   // 三角
+    g.fillStyle = '#e39a6b'; g.beginPath();
+    g.moveTo(cx, y + s * .18); g.lineTo(x + s * .84, y + s * .82); g.lineTo(x + s * .16, y + s * .82);
+    g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(150,90,50,.45)'; g.lineWidth = Math.max(1, s * .05); g.stroke();
+  } else if (art === 'circle'){                     // 圆点
+    g.fillStyle = '#7fc4a4'; g.beginPath(); g.arc(cx, cy, s * .3, 0, 6.2832); g.fill();
+    g.strokeStyle = 'rgba(50,110,80,.4)'; g.lineWidth = Math.max(1, s * .05); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.4)';
+    g.beginPath(); g.arc(cx - s * .1, cy - s * .1, s * .09, 0, 6.2832); g.fill();
+  } else if (art === 'star'){                       // 星星
+    g.beginPath();
+    for (i = 0; i < 10; i++){
+      a = -Math.PI / 2 + i * Math.PI / 5; rr = (i % 2 === 0) ? s * .34 : s * .15;
+      px2 = cx + Math.cos(a) * rr; py2 = cy + Math.sin(a) * rr;
+      if (i === 0) g.moveTo(px2, py2); else g.lineTo(px2, py2);
+    }
+    g.closePath(); g.fillStyle = '#e8b923'; g.fill();
+    g.strokeStyle = 'rgba(150,110,20,.5)'; g.lineWidth = Math.max(1, s * .04); g.stroke();
+  } else if (art === 'ladder'){                     // 梯子
+    g.strokeStyle = '#a98c5f'; g.lineWidth = Math.max(1.5, s * .07); g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x + s * .28, y + s * .16); g.lineTo(x + s * .28, y + s * .84);
+    g.moveTo(x + s * .72, y + s * .16); g.lineTo(x + s * .72, y + s * .84); g.stroke();
+    g.lineWidth = Math.max(1, s * .05);
+    for (i = 1; i <= 3; i++){
+      var yy = y + s * (.16 + i * .17);
+      g.beginPath(); g.moveTo(x + s * .28, yy); g.lineTo(x + s * .72, yy); g.stroke();
+    }
+    g.lineCap = 'butt';
+  } else if (art === 'arrow'){                      // 箭头
+    g.fillStyle = '#6f7fc4'; g.beginPath();
+    g.moveTo(x + s * .16, cy - s * .17); g.lineTo(x + s * .46, cy - s * .17); g.lineTo(x + s * .46, cy - s * .3);
+    g.lineTo(x + s * .84, cy); g.lineTo(x + s * .46, cy + s * .3); g.lineTo(x + s * .46, cy + s * .17);
+    g.lineTo(x + s * .16, cy + s * .17);
+    g.closePath(); g.fill();
+  } else if (art === 'flag'){                       // 旗子
+    g.strokeStyle = '#8d93a8'; g.lineWidth = Math.max(1.5, s * .07);
+    g.beginPath(); g.moveTo(x + s * .3, y + s * .12); g.lineTo(x + s * .3, y + s * .88); g.stroke();
+    g.fillStyle = '#d96a6a'; g.beginPath();
+    g.moveTo(x + s * .32, y + s * .16); g.lineTo(x + s * .8, y + s * .3); g.lineTo(x + s * .32, y + s * .46);
+    g.closePath(); g.fill();
+  } else if (art === 'heart'){                      // 爱心
+    g.fillStyle = '#e26d7e'; g.beginPath();
+    g.moveTo(cx, y + s * .78);
+    g.bezierCurveTo(x + s * .05, y + s * .55, x + s * .12, y + s * .18, cx, y + s * .32);
+    g.bezierCurveTo(x + s * .88, y + s * .18, x + s * .95, y + s * .55, cx, y + s * .78);
+    g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.35)';
+    g.beginPath(); g.arc(cx - s * .12, cy - s * .08, s * .07, 0, 6.2832); g.fill();
+  } else if (art === 'coin'){                       // 金币
+    g.fillStyle = '#e8b923'; g.beginPath(); g.arc(cx, cy, s * .3, 0, 6.2832); g.fill();
+    g.strokeStyle = 'rgba(150,110,20,.55)'; g.lineWidth = Math.max(1, s * .05); g.stroke();
+    g.strokeStyle = 'rgba(255,240,180,.8)'; g.lineWidth = Math.max(1, s * .04);
+    g.beginPath(); g.arc(cx, cy, s * .17, 0, 6.2832); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.45)';
+    g.beginPath(); g.arc(cx - s * .1, cy - s * .11, s * .07, 0, 6.2832); g.fill();
+  } else if (art === 'gem'){                        // 宝石
+    g.fillStyle = '#8fd0e8'; g.beginPath();
+    g.moveTo(cx, y + s * .16); g.lineTo(x + s * .8, cy); g.lineTo(cx, y + s * .84); g.lineTo(x + s * .2, cy);
+    g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(50,110,140,.5)'; g.lineWidth = Math.max(1, s * .04); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.5)';
+    g.beginPath(); g.moveTo(cx, y + s * .16); g.lineTo(cx, y + s * .84);
+    g.moveTo(x + s * .2, cy); g.lineTo(x + s * .8, cy); g.stroke();
+  } else if (art === 'cloud'){                      // 云朵
+    g.fillStyle = '#eef2f8'; g.beginPath();
+    g.arc(x + s * .34, cy + s * .06, s * .2, 0, 6.2832);
+    g.arc(cx + s * .02, cy - s * .1, s * .24, 0, 6.2832);
+    g.arc(x + s * .68, cy + s * .06, s * .2, 0, 6.2832);
+    g.fill();
+    g.strokeStyle = 'rgba(120,140,170,.45)'; g.lineWidth = Math.max(1, s * .04); g.stroke();
+  } else if (art === 'tree'){                       // 树
+    g.fillStyle = '#a98c5f'; g.fillRect(cx - s * .07, cy - s * .02, s * .14, s * .34);
+    g.fillStyle = '#6fae7c'; g.beginPath();
+    g.moveTo(cx, y + s * .12); g.lineTo(x + s * .76, cy + s * .1); g.lineTo(x + s * .24, cy + s * .1);
+    g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(50,100,60,.35)'; g.lineWidth = Math.max(1, s * .04); g.stroke();
+  } else if (art === 'house'){                      // 房子
+    g.fillStyle = '#e8dcc4'; g.fillRect(x + s * .24, cy - s * .02, s * .52, s * .38);
+    g.fillStyle = '#c96f5a'; g.beginPath();
+    g.moveTo(x + s * .16, cy); g.lineTo(cx, y + s * .2); g.lineTo(x + s * .84, cy);
+    g.closePath(); g.fill();
+    g.fillStyle = '#8d93a8'; g.fillRect(cx - s * .08, cy + s * .16, s * .16, s * .2);   // 门
+  } else if (art === 'chest'){                      // 宝箱
+    g.fillStyle = '#a98c5f'; g.fillRect(x + s * .2, cy - s * .1, s * .6, s * .44);
+    g.strokeStyle = 'rgba(110,80,40,.5)'; g.lineWidth = Math.max(1, s * .05);
+    g.strokeRect(x + s * .2, cy - s * .1, s * .6, s * .44);
+    g.fillStyle = '#e8b923'; g.fillRect(cx - s * .05, cy - s * .03, s * .1, s * .12);    // 锁
+  } else if (art === 'potion'){                     // 药水
+    g.fillStyle = '#9a7fd0'; g.beginPath();
+    g.moveTo(cx - s * .2, y + s * .2); g.lineTo(cx + s * .2, y + s * .2);
+    g.lineTo(cx + s * .26, cy + s * .12); g.lineTo(cx - s * .26, cy + s * .12);
+    g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(90,60,140,.5)'; g.lineWidth = Math.max(1, s * .05); g.stroke();
+    g.strokeStyle = '#8d93a8';                                              // 瓶塞
+    g.beginPath(); g.moveTo(cx - s * .08, y + s * .2); g.lineTo(cx - s * .08, y + s * .12);
+    g.moveTo(cx + s * .08, y + s * .2); g.lineTo(cx + s * .08, y + s * .12); g.stroke();
+  } else if (art === 'shield'){                     // 盾牌
+    g.fillStyle = '#7f9fd8'; g.beginPath();
+    g.moveTo(x + s * .22, y + s * .18); g.lineTo(x + s * .78, y + s * .18);
+    g.lineTo(x + s * .78, cy + s * .08); g.quadraticCurveTo(cx, y + s * .88, x + s * .22, cy + s * .08);
+    g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(60,80,140,.5)'; g.lineWidth = Math.max(1, s * .05); g.stroke();
+    g.fillStyle = '#e8b923'; g.beginPath(); g.arc(cx, cy - s * .02, s * .09, 0, 6.2832); g.fill();
+  } else if (art === 'sword'){                      // 剑
+    g.strokeStyle = '#b9c2d4'; g.lineWidth = Math.max(2, s * .1); g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x + s * .66, y + s * .18); g.lineTo(x + s * .36, y + s * .62); g.stroke();
+    g.strokeStyle = '#a98c5f'; g.lineWidth = Math.max(2, s * .07);
+    g.beginPath(); g.moveTo(x + s * .28, y + s * .72); g.lineTo(x + s * .5, y + s * .5); g.stroke();
+    g.fillStyle = '#8d93a8'; g.beginPath(); g.arc(x + s * .26, y + s * .76, s * .07, 0, 6.2832); g.fill();
+    g.lineCap = 'butt';
+  } else if (art === 'crown'){                      // 皇冠
+    g.fillStyle = '#e8b923'; g.beginPath();
+    g.moveTo(x + s * .2, y + s * .72); g.lineTo(x + s * .2, y + s * .3);
+    g.lineTo(cx - s * .12, y + s * .5); g.lineTo(cx, y + s * .2); g.lineTo(cx + s * .12, y + s * .5);
+    g.lineTo(x + s * .8, y + s * .3); g.lineTo(x + s * .8, y + s * .72);
+    g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(150,110,20,.55)'; g.lineWidth = Math.max(1, s * .05); g.stroke();
+    g.fillStyle = '#d96a6a'; g.beginPath(); g.arc(cx, y + s * .48, s * .06, 0, 6.2832); g.fill();
+  } else if (art === 'mushroom'){                   // 蘑菇
+    g.fillStyle = '#f0ece2'; g.fillRect(cx - s * .09, cy - s * .02, s * .18, s * .32);
+    g.fillStyle = '#d96a6a'; g.beginPath();
+    g.moveTo(x + s * .2, cy); g.quadraticCurveTo(cx, y + s * .1, x + s * .8, cy);
+    g.closePath(); g.fill();
+    g.fillStyle = '#f0ece2';
+    g.beginPath(); g.arc(x + s * .34, cy - s * .08, s * .06, 0, 6.2832);
+    g.arc(x + s * .62, cy - s * .04, s * .05, 0, 6.2832); g.fill();
+  } else if (art === 'fish'){                       // 鱼
+    g.fillStyle = '#7fb8d8'; g.beginPath();
+    g.moveTo(x + s * .24, cy);
+    g.quadraticCurveTo(cx, y + s * .2, x + s * .72, cy);
+    g.quadraticCurveTo(cx, y + s * .8, x + s * .24, cy);
+    g.closePath(); g.fill();
+    g.fillStyle = '#5f93b8'; g.beginPath();                       // 尾巴
+    g.moveTo(x + s * .72, cy); g.lineTo(x + s * .88, y + s * .3); g.lineTo(x + s * .88, y + s * .7);
+    g.closePath(); g.fill();
+    g.fillStyle = '#3a4a5a'; g.beginPath(); g.arc(x + s * .34, cy - s * .05, s * .05, 0, 6.2832); g.fill();
+  }
+}
+function imgOf(src){                     // dataURL → Image（加载完自动重画一次）
+  if (!IMGC[src]){
+    var im = new Image();
+    im.onload = function(){
+      if (typeof draw === 'function'){ miniDirty = true; draw(); }
+      if (typeof refreshGlyphs === 'function'){ try { refreshGlyphs(); } catch (e){} }
+      var md = (typeof $ === 'function') ? $('blkModal') : null;
+      if (md && !md.classList.contains('hidden')){           // 弹窗开着：预览和列表图标一起刷新
+        if (typeof drawBlkPrev === 'function') drawBlkPrev();
+        if (typeof renderBlkList === 'function') renderBlkList();
+      }
+    };
+    im.src = src;
+    IMGC[src] = im;
+  }
+  return IMGC[src];
+}
+function drawArt(g, b, x, y, s){         // 画一个图块定义（有图片用图片，否则用内置图形）
+  if (b.img){
+    var im = imgOf(b.img);
+    if (im && im.complete && im.naturalWidth){
+      var k = Math.min(s * .82 / im.naturalWidth, s * .82 / im.naturalHeight);
+      g.drawImage(im, x + (s - im.naturalWidth * k) / 2, y + (s - im.naturalHeight * k) / 2,
+                  im.naturalWidth * k, im.naturalHeight * k);
+    } else {                             // 还在加载：占位虚线框
+      g.strokeStyle = 'rgba(120,132,156,.55)'; g.lineWidth = 1; g.setLineDash([3, 3]);
+      g.strokeRect(x + s * .18, y + s * .18, s * .64, s * .64); g.setLineDash([]);
+    }
+    return;
+  }
+  drawArtShape(g, b.art, x, y, s);
+}
+
+/* ---------------- 单格绘制（画布与工具图标共用） ---------------- */
+function paintTile(g, ch, x, y, s){
+  var bd = TA(TH.brickLine, .45);      // 通用描边（砖缝/断桥裂纹）
+  var cb = blockAt(ch);                  // 自定义图块优先按定义画
+  if (cb){ drawArt(g, cb, x, y, s); return; }
+  if (ch === '#'){                                  // 整砖
+    g.fillStyle = TH.brick; g.fillRect(x, y, s, s);
+    g.strokeStyle = bd; g.lineWidth = Math.max(1, s * 0.06); g.strokeRect(x + .5, y + .5, s - 1, s - 1);
+  } else if (ch === '-'){                           // 上半砖：占上半格
+    g.fillStyle = TH.brick; g.fillRect(x, y, s, s / 2);
+    g.strokeStyle = bd; g.lineWidth = Math.max(1, s * 0.06);
+    g.beginPath(); g.moveTo(x, y + s / 2); g.lineTo(x + s, y + s / 2); g.stroke();
+  } else if (ch === '='){                           // 下半砖：占下半格
+    g.fillStyle = TH.brick; g.fillRect(x, y + s / 2, s, s / 2);
+    g.strokeStyle = bd; g.lineWidth = Math.max(1, s * 0.06);
+    g.beginPath(); g.moveTo(x, y + s / 2); g.lineTo(x + s, y + s / 2); g.stroke();
+  } else if (ch === '~'){                           // 断桥：本体可踩，影子踩上就消失
+    g.fillStyle = TH.bridge; g.fillRect(x, y + s * .34, s, s * .3);
+    g.strokeStyle = TA(TH.brickLine, .6); g.lineWidth = Math.max(1, s * .05);
+    g.strokeRect(x + .5, y + s * .34, s - 1, s * .3);
+    g.strokeStyle = TA(TH.brickLine, .55); g.lineWidth = Math.max(1, s * .06);
+    g.beginPath();                                  // 裂纹（暗示易碎）
+    g.moveTo(x + s * .3, y + s * .34); g.lineTo(x + s * .42, y + s * .64);
+    g.moveTo(x + s * .62, y + s * .34); g.lineTo(x + s * .5, y + s * .64);
+    g.stroke();
+  } else if (ch === '^'){                           // 尖刺：三角
+    g.fillStyle = TH.spike; g.beginPath();
+    g.moveTo(x + s / 2, y + s * .22); g.lineTo(x + s * .86, y + s * .84); g.lineTo(x + s * .14, y + s * .84);
+    g.closePath(); g.fill();
+  } else if (ch === 'E'){                           // 升降木板（编号画在画布上，见 draw）
+    g.fillStyle = TH.wood; g.fillRect(x + s * .06, y + s * .4, s * .88, s * .24);
+    g.strokeStyle = TA(TH.wood, .9); g.lineWidth = Math.max(1, s * .05);
+    g.strokeRect(x + s * .06, y + s * .4, s * .88, s * .24);
+    g.fillStyle = dark(TH.wood, .25);
+    g.fillRect(x + s * .12, y + s * .16, s * .1, s * .24); g.fillRect(x + s * .78, y + s * .16, s * .1, s * .24);
+  } else if (ch === 'A'){                           // 开关（编号画在画布上，见 draw）
+    g.fillStyle = TH.switch_; g.fillRect(x + s * .18, y + s * .56, s * .64, s * .26);
+    g.fillStyle = '#fdfdff'; g.fillRect(x + s * .3, y + s * .3, s * .4, s * .26);
+  } else if (ch >= '1' && ch <= '9'){               // 传送门：椭圆门框 + 漩涡（同数字 = 一对）
+    g.save();
+    g.translate(x + s / 2, y + s / 2);
+    g.strokeStyle = TH.portal; g.lineWidth = Math.max(1.5, s * .1);
+    g.beginPath(); g.ellipse(0, 0, s * .3, s * .42, 0, 0, 6.2832); g.stroke();
+    g.strokeStyle = TA(TH.portal, .75); g.lineWidth = Math.max(1, s * .06);
+    g.beginPath();
+    for (var a = 0; a < 12; a++){                   // 内圈漩涡
+      var ang = a * .55, rr = s * .06 + a * s * .018;
+      var pxx = Math.cos(ang) * rr, pyy = Math.sin(ang) * rr;
+      if (a === 0) g.moveTo(pxx, pyy); else g.lineTo(pxx, pyy);
+    }
+    g.stroke();
+    if (s >= 14){
+      g.fillStyle = dark(TH.portal, .35); g.font = 'bold ' + (s * .26) + 'px sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, 0, -s * .34);
+    }
+    g.restore();
+  } else if (ch === 'K'){                           // 钥匙：圆环 + 齿
+    g.strokeStyle = TH.key; g.lineWidth = Math.max(1.5, s * .11);
+    g.beginPath(); g.arc(x + s * .42, y + s * .38, s * .19, 0, 6.2832); g.stroke();
+    g.beginPath(); g.moveTo(x + s * .58, y + s * .52); g.lineTo(x + s * .84, y + s * .8); g.stroke();
+    g.beginPath(); g.moveTo(x + s * .74, y + s * .64); g.lineTo(x + s * .62, y + s * .78); g.stroke();
+  } else if (ch === 'D'){                           // 机关门
+    g.fillStyle = TH.door; g.fillRect(x + s * .22, y + s * .1, s * .56, s * .8);
+    g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x + s * .3, y + s * .2, s * .16, s * .6);
+  } else if (ch === 'S'){                           // 告示牌
+    g.fillStyle = '#7a6a4f'; g.fillRect(x + s * .46, y + s * .5, s * .08, s * .34);
+    g.fillStyle = light(TH.brick, .3); g.fillRect(x + s * .16, y + s * .22, s * .68, s * .32);
+    g.strokeStyle = TA(TH.brickLine, .5); g.lineWidth = Math.max(1, s * .04); g.strokeRect(x + s * .16, y + s * .22, s * .68, s * .32);
+  } else if (ch === 'G'){                           // 星星
+    g.fillStyle = TH.key; g.font = (s * .74) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('★', x + s / 2, y + s * .54);
+  } else if (ch === 'X'){                           // 出口
+    g.fillStyle = TA(TH.goal, .28); g.fillRect(x + s * .1, y + s * .1, s * .8, s * .8);
+    g.strokeStyle = TH.goal; g.lineWidth = Math.max(1, s * .08); g.strokeRect(x + s * .18, y + s * .18, s * .64, s * .64);
+    g.fillStyle = dark(TH.goal, .25); g.font = 'bold ' + (s * .5) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('×', x + s / 2, y + s * .54);
+  } else if (ch === 'P'){                           // 出生点
+    g.fillStyle = TH.switch_; g.beginPath(); g.arc(x + s / 2, y + s * .38, s * .16, 0, 6.2832); g.fill();
+    g.fillRect(x + s * .36, y + s * .54, s * .28, s * .3);
+  }
+}
+
+/* ---------------- 画布渲染 ---------------- */
+var dpr = 1, vw = 0, vh = 0;
+function resize(){
+  dpr = window.devicePixelRatio || 1;
+  vw = stage.clientWidth; vh = stage.clientHeight;
+  cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+function draw(){
+  ctx.save();
+  ctx.fillStyle = TH.bg; ctx.fillRect(0, 0, vw, vh);
+  ctx.translate(-camX, -camY);
+  var s = scale;
+  var c0 = Math.max(0, Math.floor(camX / s)), c1 = Math.min(COLS - 1, Math.floor((camX + vw) / s));
+  var r0 = Math.max(0, Math.floor(camY / s)), r1 = Math.min(ROWS - 1, Math.floor((camY + vh) / s));
+  // 棋盘底
+  for (var r = r0; r <= r1; r++){
+    for (var c = c0; c <= c1; c++){
+      ctx.fillStyle = ((c + r) & 1) ? dark(TH.bg, .04) : TH.bg;
+      ctx.fillRect(c * s, r * s, s, s);
+    }
+  }
+  // 格子内容
+  for (r = r0; r <= r1; r++){
+    for (c = c0; c <= c1; c++){
+      var ch = grid[r][c];
+      if (ch !== '.') paintTile(ctx, ch, c * s, r * s, s);
+    }
+  }
+  // 网格线
+  if (showGrid && s >= 9){
+    ctx.strokeStyle = 'rgba(120,132,156,.16)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (c = c0; c <= c1 + 1; c++){ var x = c * s + .5; ctx.moveTo(x, r0 * s); ctx.lineTo(x, (r1 + 1) * s); }
+    for (r = r0; r <= r1 + 1; r++){ var y = r * s + .5; ctx.moveTo(c0 * s, y); ctx.lineTo((c1 + 1) * s, y); }
+    ctx.stroke();
+  }
+  // 编号（默认关：大图太密）
+  if (showNo && s >= 16){
+    var n = 0;
+    for (c = c0; c <= c1; c++){
+      for (r = r0; r <= r1; r++){
+        var ch2 = grid[r][c];
+        if (ch2 === '.') continue;
+        n++;
+        ctx.fillStyle = ch2 === '^' ? 'rgba(200,70,50,.9)' : 'rgba(50,58,76,.72)';
+        ctx.font = '600 ' + Math.max(9, s * .26) + 'px Consolas,monospace';
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        ctx.fillText(n, c * s + 2, r * s + 1);
+      }
+    }
+  }
+  // 地图边界
+  ctx.strokeStyle = '#5c6076'; ctx.lineWidth = 2;
+  ctx.strokeRect(0, 0, COLS * s, ROWS * s);
+  // 装置编号：木板 E1/E2… 开关 S1/S2…（缩放够大才画，避免糊成一团）
+  if (s >= 18 && MECHS.length){
+    ctx.font = '600 ' + Math.max(9, s * .3) + 'px Consolas,monospace';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    for (var mi = 0; mi < MECHS.length; mi++){
+      var m = MECHS[mi];
+      if (m.c < c0 || m.c > c1 || m.r < r0 || m.r > r1) continue;
+      ctx.fillStyle = m.type === 'wood' ? 'rgba(96,62,26,.92)' : 'rgba(70,58,120,.92)';
+      ctx.fillRect(m.c * s + 1, m.r * s + 1, s * .46, s * .32);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(m.id, m.c * s + 2, m.r * s + 2);
+    }
+  }
+  // 鼠标所在格
+  if (hoverC >= 0 && hoverR >= 0){
+    ctx.strokeStyle = '#3f6fd8'; ctx.lineWidth = 2;
+    ctx.strokeRect(hoverC * s + 1, hoverR * s + 1, s - 2, s - 2);
+  }
+  // 矩形拖拽预览
+  if (recting && rectStart && rectEnd){
+    var rc0 = Math.min(rectStart.c, rectEnd.c), rc1 = Math.max(rectStart.c, rectEnd.c);
+    var rr0 = Math.min(rectStart.r, rectEnd.r), rr1 = Math.max(rectStart.r, rectEnd.r);
+    ctx.save();
+    ctx.fillStyle = 'rgba(63,111,216,.10)';
+    ctx.fillRect(rc0 * s, rr0 * s, (rc1 - rc0 + 1) * s, (rr1 - rr0 + 1) * s);
+    ctx.strokeStyle = '#3f6fd8'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+    ctx.strokeRect(rc0 * s, rr0 * s, (rc1 - rc0 + 1) * s, (rr1 - rr0 + 1) * s);
+    ctx.restore();
+  }
+  ctx.restore();
+  drawMini();
+}
+/* ---------------- 缩略导航（大图找位置全靠它） ---------------- */
+var mini = $('mini'), mctx = mini.getContext('2d');
+var miniBase = document.createElement('canvas'), miniDirty = true;
+function miniGeom(){
+  var s = Math.min((mini.width - 8) / COLS, (mini.height - 8) / ROWS);
+  return { s:s, ox:(mini.width - COLS * s) / 2, oy:(mini.height - ROWS * s) / 2 };
+}
+function buildMiniBase(){
+  var g = miniGeom();
+  miniBase.width = mini.width; miniBase.height = mini.height;
+  var b = miniBase.getContext('2d');
+  b.clearRect(0, 0, mini.width, mini.height);
+  b.fillStyle = '#e9eef6'; b.fillRect(g.ox, g.oy, COLS * g.s, ROWS * g.s);
+  // 抽稀：格数控制在 ~1 万以内，避免 100×100 每次重绘卡顿
+  var step = Math.max(1, Math.ceil(COLS / 100));
+  var sz = Math.max(1, g.s * step);
+  for (var r = 0; r < ROWS; r += step)
+    for (var c = 0; c < COLS; c += step){
+      var ch = grid[r][c]; if (ch === '.') continue;
+      var bk = blockAt(ch);
+      b.fillStyle = bk ? (bk.img ? '#c9a227' : '#7f9bd4')
+                   : ch === '^' ? '#c86a5a' : ch === '~' ? '#7f8ca3' : ch === 'X' ? '#63b37a' : '#8f98ac';
+      b.fillRect(g.ox + c * g.s, g.oy + r * g.s, sz, sz);
+    }
+}
+function drawMini(){
+  if (miniDirty){ buildMiniBase(); miniDirty = false; }
+  mctx.clearRect(0, 0, mini.width, mini.height);
+  mctx.drawImage(miniBase, 0, 0);
+  var g = miniGeom();
+  var vx = g.ox + camX / scale * g.s, vy = g.oy + camY / scale * g.s;
+  var vw2 = Math.max(3, vw / scale * g.s), vh2 = Math.max(3, vh / scale * g.s);
+  mctx.strokeStyle = '#3f6fd8'; mctx.lineWidth = 1.5;
+  mctx.strokeRect(vx + .5, vy + .5, vw2, vh2);
+  mctx.strokeStyle = 'rgba(63,111,216,.35)'; mctx.lineWidth = 1;
+  mctx.strokeRect(g.ox + .5, g.oy + .5, COLS * g.s, ROWS * g.s);
+}
+function miniGoto(e){                       // 点/拖缩略图 → 视口中心对准该点
+  var g = miniGeom();
+  var c = (e.offsetX - g.ox) / g.s, r = (e.offsetY - g.oy) / g.s;
+  camX = c * scale - vw / 2; camY = r * scale - vh / 2;
+  draw();
+}
+mini.addEventListener('pointerdown', function(e){
+  mini.setPointerCapture(e.pointerId); mini._on = true; miniGoto(e);
+});
+mini.addEventListener('pointermove', function(e){ if (mini._on) miniGoto(e); });
+mini.addEventListener('pointerup', function(){ mini._on = false; });
+
+function cellAt(px, py){
+  var c = Math.floor((px + camX) / scale), r = Math.floor((py + camY) / scale);
+  return (c >= 0 && c < COLS && r >= 0 && r < ROWS) ? { c:c, r:r } : null;
+}
+
+/* ---------------- 装置表：木板/开关自动编号 + 开关绑定目标 ----------------
+   MECHS = [{ id:'E1', type:'wood',   c, r },
+            { id:'S1', type:'switch', c, r, bind:'E2' | 'door' | '' }]
+   木板统一字符 E、开关统一字符 A —— 编号和"谁控制谁"全记在这张表里，随地图导出。 */
+var MECHS = [];
+var newBind = '';                   // 新放置的开关默认绑到哪儿（由绑定面板的下拉决定）
+function mechAt(c, r){
+  for (var i = 0; i < MECHS.length; i++) if (MECHS[i].c === c && MECHS[i].r === r) return MECHS[i];
+  return null;
+}
+function nextId(type){
+  var p = type === 'wood' ? 'E' : 'S', n = 1, used = {};
+  for (var i = 0; i < MECHS.length; i++) used[MECHS[i].id] = 1;
+  while (used[p + n]) n++;
+  return p + n;
+}
+function firstWood(){
+  for (var i = 0; i < MECHS.length; i++) if (MECHS[i].type === 'wood') return MECHS[i].id;
+  return 'door';
+}
+function addMech(type, c, r, bind){
+  var m = { id:nextId(type), type:type, c:c, r:r };
+  if (type === 'switch') m.bind = (bind === undefined ? (newBind || firstWood()) : bind);
+  MECHS.push(m);
+  return m;
+}
+function delMech(c, r){
+  var m = mechAt(c, r); if (!m) return;
+  MECHS.splice(MECHS.indexOf(m), 1);
+  for (var i = 0; i < MECHS.length; i++)            // 指向它的开关改为未绑定
+    if (MECHS[i].bind === m.id) MECHS[i].bind = '';
+}
+function countKeys(){
+  var n = 0;
+  for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) if (grid[r][c] === 'K') n++;
+  return n;
+}
+/* 传送门：数字 1~9 = 传送门对编号，同一个数字放两处就是一对（不与其他对互通）。
+   放置时自动挑"还没凑满两个端点"的编号 → 第 1、2 个自动成一对，第 3 个开新一对。 */
+function portalChar(){
+  for (var n = 1; n <= 9; n++){
+    var cnt = 0;
+    for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) if (grid[r][c] === String(n)) cnt++;
+    if (cnt < 2) return String(n);
+  }
+  return '1';
+}
+function portalPairs(){
+  var out = [];
+  for (var n = 1; n <= 9; n++){
+    var ends = [];
+    for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++)
+      if (grid[r][c] === String(n)) ends.push({ c:c, r:r });
+    if (ends.length) out.push({ id:'P' + n, ends:ends });
+  }
+  return out;
+}
+/* 撤销 / 清空 / 改尺寸后：装置表与格子内容重新对齐（保留仍在的编号与绑定） */
+function syncMech(){
+  var r, c, ch;
+  MECHS = MECHS.filter(function(m){
+    if (m.r >= ROWS || m.c >= COLS) return false;
+    ch = grid[m.r][m.c];
+    return (m.type === 'wood'   && (ch === 'E' || ch === 'F')) ||
+           (m.type === 'switch' && (ch === 'A' || ch === 'B' || ch === 'C'));
+  });
+  for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++){
+    ch = grid[r][c];
+    if (ch === '.' || mechAt(c, r)) continue;
+    if (ch === 'E' || ch === 'F') addMech('wood', c, r);
+    else if (ch === 'A' || ch === 'B' || ch === 'C') addMech('switch', c, r);
+  }
+  renderMech();
+}
+
+/* ---------------- 放置 / 撤销 ---------------- */
+/* 装置底座：开关这类「立在地上的东西」放下去时，若正下方那格是空的，
+   自动补一块上半砖'-'当底座，免得摆出悬空开关（可在顶部关掉）。 */
+var PEDESTAL = 'ABC';         // 需要底座的字符
+function pedestalOn(){ var el = $('cbPedestal'); return el ? el.checked : true; }
+function placeCell(c, r, ch){                       // 只改单格 + 装置登记（不做唯一角色清扫）
+  var old = grid[r][c];
+  if (old === ch) return;
+  if (old === 'E' || old === 'A' || old === 'B' || old === 'C' || old === 'F') delMech(c, r);
+  if (ch === '1') ch = portalChar();                 // 传送门：自动分配对编号
+  grid[r][c] = ch;
+  if (ch === 'E' || ch === 'F') addMech('wood', c, r);
+  else if (ch === 'A' || ch === 'B' || ch === 'C') addMech('switch', c, r);
+  miniDirty = true;
+  if (stroke) stroke.push({ c:c, r:r, from:old, to:ch });
+}
+function put(c, r, ch){
+  if (ch !== '.' && UNIQ.indexOf(ch) >= 0){        // 唯一角色：先清掉已有的那一个
+    for (var rr = 0; rr < ROWS; rr++) for (var cc = 0; cc < COLS; cc++)
+      if (grid[rr][cc] === ch){ grid[rr][cc] = '.'; if (stroke) stroke.push({ c:cc, r:rr, from:ch, to:'.' }); }
+  }
+  placeCell(c, r, ch);
+  /* 放的是「立在地上的装置」→ 正下方那格如果是空的，自动补一块上半砖当底座 */
+  if (pedestalOn() && PEDESTAL.indexOf(ch) >= 0 && r + 1 < ROWS && grid[r + 1][c] === '.'){
+    grid[r + 1][c] = '-';
+    if (stroke) stroke.push({ c:c, r:r + 1, from:'.', to:'-' });
+  }
+}
+function floodFill(c0, r0, ch){                     // 4 连通漫水填充
+  var target = grid[r0][c0];
+  if (target === ch) return;
+  var q = [[c0, r0]];
+  while (q.length){
+    var p = q.pop(), c = p[0], r = p[1];
+    if (c < 0 || c >= COLS || r < 0 || r >= ROWS) continue;
+    if (grid[r][c] !== target) continue;
+    placeCell(c, r, ch);
+    q.push([c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]);
+  }
+}
+function applyRect(a, b, ch, filled){               // 矩形：默认描边，filled=填实
+  if (!a || !b) return;
+  var c0 = Math.min(a.c, b.c), c1 = Math.max(a.c, b.c);
+  var r0 = Math.min(a.r, b.r), r1 = Math.max(a.r, b.r);
+  for (var r = r0; r <= r1; r++)
+    for (var c = c0; c <= c1; c++){
+      var edge = (r === r0 || r === r1 || c === c0 || c === c1);
+      if (filled || edge) put(c, r, ch);
+    }
+}
+function undo(){
+  if (!undoStack.length){ toast('没有可撤销的操作'); return; }
+  var st = undoStack.pop();
+  for (var i = st.length - 1; i >= 0; i--) grid[st[i].r][st[i].c] = st[i].from;
+  miniDirty = true; syncMech(); draw(); save(); toast('已撤销');
+}
+
+/* ---------------- 导入 / 导出 / 存档 ---------------- */
+function exportMap(){
+  var lines = ['var MAP = ['];
+  for (var r = 0; r < ROWS; r++)
+    lines.push("  '" + grid[r].join('') + "', // " + r + '  y=' + (ROWS - r));
+  lines.push('];');
+  lines.push('');
+  lines.push('// 装置绑定：开关 S# 控制 木板 E# 或机关门（地图里有几个就复制几行，别漏）');
+  lines.push('var MECH = [');
+  for (var i = 0; i < MECHS.length; i++){
+    var m = MECHS[i];
+    if (m.type === 'portal') continue;              // 传送门对由下面按地图字符输出，避免重复
+    lines.push("  { id:'" + m.id + "', type:'" + m.type + "', c:" + m.c + ', r:' + m.r +
+               (m.type === 'switch' ? ", bind:'" + (m.bind || '') + "'" : '') + ' },');
+  }
+  portalPairs().forEach(function(p){
+    if (p.ends.length === 2)
+      lines.push("  { id:'" + p.id + "', type:'portal', c:" + p.ends[0].c + ', r:' + p.ends[0].r +
+                 ', c2:' + p.ends[1].c + ', r2:' + p.ends[1].r + ' },');
+  });
+  lines.push('];');
+  if (BLOCKS.length){                    // 自定义图块：随地图一起导出，整段贴进游戏即可显示
+    lines.push('');
+    lines.push('// 自定义装饰图块（贴纸）：ch=地图字符 name=名称 note=注释 art=内置图形 img=自定义图片(dataURL，优先于 art)');
+    lines.push('// 不挡路、不影响机关；整段粘到 index.html 的 LEVELS 定义之前');
+    lines.push('var BLOCKS = [');
+    BLOCKS.forEach(function(b){
+      lines.push("  { ch:'" + b.ch + "', name:'" + escAttr(b.name) + "', note:'" + escAttr(b.note) +
+                 "', art:'" + b.art + "', img:" + (b.img ? "'" + b.img + "'" : 'null') + ' },');
+    });
+    lines.push('];');
+  }
+  var nk = countKeys();
+  if (nk) lines.push('// 钥匙 ' + nk + ' 把：集齐才能开出口');
+  lines.push('// 开关 bind 可填：木板 E# / 传送门 P# / door（机关门）');
+  lines.push('');
+  lines.push('// 地图风格（主题）：整段粘到 LEVELS 定义之前；不贴则游戏用默认米白');
+  lines.push('var THEME = { name:' + escAttr(TH.name || '自定义') + ',');
+  THEME_KEYS.forEach(function(pair, i){
+    lines.push('  ' + pair[0] + ":'" + TH[pair[0]] + "'" + (i < THEME_KEYS.length - 1 ? ',' : ''));
+  });
+  lines.push('};');
+  $('out').value = lines.join('\n');
+  toast('已导出 ' + COLS + '×' + ROWS + (nk ? '（钥匙 ' + nk + ' 把）' : '')
+        + (BLOCKS.length ? '（图块 ' + BLOCKS.length + ' 个）' : '') + '（主题 ' + (TH.name || '自定义') + '）');
+}
+/* 旧地图（A/B/C/E/F）没有 MECH 表 → 按老规则自动编号并绑定：A→E1、B→E2、C→门 */
+function inferMech(){
+  MECHS = [];
+  var r, c, ch, i;
+  for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++){
+    ch = grid[r][c];
+    if (ch === 'E' || ch === 'F') MECHS.push({ id:'E' + (MECHS.length + 1), type:'wood', c:c, r:r });
+  }
+  var woods = MECHS.slice(), n = 0;
+  for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++){
+    ch = grid[r][c];
+    if (ch !== 'A' && ch !== 'B' && ch !== 'C') continue;
+    var bind = ch === 'A' ? (woods[0] ? woods[0].id : 'door')
+             : ch === 'B' ? (woods[1] ? woods[1].id : 'door') : 'door';
+    MECHS.push({ id:'S' + (++n), type:'switch', c:c, r:r, bind:bind });
+  }
+}
+function importMap(){
+  var txt = $('out').value;
+  /* 只从 var MAP = [...] 里取行：MECH 表里也有单引号字符串（'wood'/'E3'），
+     不加这道过滤会被当成地图行，行数直接翻倍 */
+  var mp = txt.match(/var\s+MAP\s*=\s*\[([\s\S]*?)\]/);
+  var rows = (mp ? mp[1] : txt).match(/'[^']*'/g);
+  if (!rows || !rows.length){ toast('没找到地图行'); return; }
+  rows = rows.map(function(s){ return s.slice(1, -1); });
+  var w = 0; for (var i = 0; i < rows.length; i++) w = Math.max(w, rows[i].length);
+  if (rows.length > 100 || w > 100){ toast('超出 100×100'); return; }
+  COLS = Math.max(w, 2); ROWS = rows.length;
+  $('inCols').value = COLS; $('inRows').value = ROWS;
+  blankGrid(COLS, ROWS);
+  for (var r = 0; r < ROWS; r++)
+    for (var c = 0; c < COLS; c++) grid[r][c] = rows[r][c] || '.';
+  // 装置表：跟着地图里的 MECH 走；没有就按字符推断（旧地图 A/B/C/E/F）
+  MECHS = [];
+  var mb = txt.match(/var\s+MECH\s*=\s*\[([\s\S]*?)\]/);
+  if (mb){
+    (mb[1].match(/\{[^}]*\}/g) || []).forEach(function(it){
+      function g(k){ var mm = it.match(new RegExp(k + "\\s*:\\s*'?([^,'\\s}]*)'?")); return mm ? mm[1] : ''; }
+      var id = g('id'), ty = g('type');
+      if (!id || !ty) return;
+      var m = { id:id, type:ty, c:+g('c'), r:+g('r') };
+      if (ty === 'switch') m.bind = g('bind');
+      MECHS.push(m);
+    });
+  }
+  if (!MECHS.length) inferMech();
+  /* 图块定义：跟着文本里的 var BLOCKS 走（同字符覆盖定义、新字符追加进来） */
+  var bb = txt.match(/var\s+BLOCKS\s*=\s*\[([\s\S]*?)\]/);
+  if (bb){
+    (bb[1].match(/\{[^}]*\}/g) || []).forEach(function(it){
+      function gs(k){ var mm = it.match(new RegExp(k + "\\s*:\\s*'([^']*)'")); return mm ? mm[1] : null; }
+      var ch = gs('ch'), ar = gs('art');
+      if (!ch || !ar) return;
+      var im = null, mi = it.match(/img\s*:\s*'([^']*)'/);
+      if (mi && mi[1]) im = mi[1];
+      var ex = blockAt(ch);
+      if (ex){ ex.name = gs('name') || ex.name; ex.note = gs('note') || ''; ex.art = ar; ex.img = im; }
+      else BLOCKS.push({ ch:ch, name:gs('name') || '图块', note:gs('note') || '', art:ar, img:im });
+    });
+    persistBlocks(); buildTools();
+  }
+  /* 主题：跟着文本里的 var THEME 走（逐字段校验，缺的用默认） */
+  var tb = txt.match(/var\s+THEME\s*=\s*\{([\s\S]*?)\}/);
+  if (tb){
+    (tb[1].match(/(\w+)\s*:\s*'(#[0-9a-fA-F]{3,6})'/g) || []).forEach(function(kv){
+      var mm = kv.match(/(\w+)\s*:\s*'(#[0-9a-fA-F]{3,6})'/);
+      if (mm && THEME_DEFAULT.hasOwnProperty(mm[1])) TH[mm[1]] = mm[2];
+    });
+    var nm2 = tb[1].match(/name\s*:\s*'([^']*)'/);
+    if (nm2) TH.name = nm2[1];
+    buildTools();
+  }
+  miniDirty = true; fit(); draw(); renderMech(); save();
+  toast('已导入 ' + COLS + '×' + ROWS + '（装置 ' + MECHS.length + '）'
+        + (BLOCKS.length ? '（图块 ' + BLOCKS.length + ' 个）' : '') + '（主题 ' + (TH.name || '默认') + '）');
+}
+/* =====================================================================
+   主题（地图风格）系统
+   - thDraft：面板里正在编辑的主题草稿；applyTh() 才真正应用到地图
+   - 参考图导入：多张图各跑一次 k-means，合并色板后按规则分配到各元素
+   ===================================================================== */
+var thDraft = null;                 // 面板编辑中的主题草稿
+var thRefs  = [];                   // 已导入的参考图（Image 对象，合并提取用）
+
+function openThMgr(th){
+  thDraft = {};
+  var src = th || TH;
+  for (var k in THEME_DEFAULT) thDraft[k] = src[k] || THEME_DEFAULT[k];
+  thRefs = [];
+  $('thName').value = thDraft.name || '';
+  $('thPalette').innerHTML = '<span class="hint">导入参考图后，提取出的色板会显示在这里</span>';
+  renderThList(); renderThCols(); drawThPrev();
+  $('thModal').classList.remove('hidden');
+}
+function closeThMgr(){ $('thModal').classList.add('hidden'); thDraft = null; }
+function renderThList(){              // 左列：预设（不可删）+ 我保存的主题
+  var box = $('thList'), html = '<div class="hintbox" style="padding:4px 2px 6px">预设风格<br>（点击试用）</div>';
+  THEME_PRESETS.forEach(function(t, i){
+    html += '<div class="bitem" data-pre="' + i + '" title="' + escHtml(t.name) + '">'
+          + '<canvas width="30" height="30" data-preic="' + i + '"></canvas>'
+          + '<span class="bnm">' + escHtml(t.name) + '</span></div>';
+  });
+  if (THEMES.length) html += '<div class="hintbox" style="padding:8px 2px 6px">我的主题</div>';
+  THEMES.forEach(function(t, i){
+    html += '<div class="bitem" data-mine="' + i + '" title="' + escHtml(t.name) + '">'
+          + '<canvas width="30" height="30" data-mineic="' + i + '"></canvas>'
+          + '<span class="bnm">' + escHtml(t.name) + '<i>' + (i + 1) + '</i></span></div>';
+  });
+  box.innerHTML = html;
+  box.querySelectorAll('canvas[data-preic]').forEach(function(c2){
+    drawThSwatch(c2.getContext('2d'), THEME_PRESETS[+c2.dataset.preic]);
+  });
+  box.querySelectorAll('canvas[data-mineic]').forEach(function(c2){
+    drawThSwatch(c2.getContext('2d'), THEMES[+c2.dataset.mineic]);
+  });
+}
+function drawThSwatch(g, t){          // 列表小图标：四色色板
+  g.clearRect(0, 0, 30, 30);
+  var cols = [t.brick, t.spike, t.bridge, t.goal];
+  for (var i = 0; i < 4; i++){
+    g.fillStyle = cols[i];
+    g.fillRect(3 + (i % 2) * 13, 3 + Math.floor(i / 2) * 13, 11, 11);
+  }
+}
+function renderThCols(){              // 逐元素选色
+  var box = $('thCols'), html = '';
+  THEME_KEYS.forEach(function(pair){
+    var k = pair[0], v = thDraft[k] || THEME_DEFAULT[k];
+    html += '<label class="cl"><input type="color" value="' + v + '" data-tc="' + k + '">'
+          + '<span>' + pair[1] + '</span></label>';
+  });
+  box.innerHTML = html;
+  box.querySelectorAll('input[data-tc]').forEach(function(inp){
+    inp.addEventListener('input', function(){ thDraft[inp.dataset.tc] = inp.value; drawThPrev(); });
+    inp.addEventListener('change', function(){ thDraft[inp.dataset.tc] = inp.value; drawThPrev(); });
+  });
+}
+function drawThPrev(){                // 大预览：3×3 样板（砖/半砖/刺/桥/木/门/钥匙/开关/出口）
+  var cv = $('thPrev'), g = cv.getContext('2d'), s = 112 / 3, i = 0;
+  var sample = ['#', '-', '^', '~', 'E', 'D', 'K', 'A', 'X'];
+  var saved = {};
+  for (var k in THEME_DEFAULT) saved[k] = TH[k];       // 样板用草稿配色，画完还原
+  for (k in THEME_DEFAULT) TH[k] = thDraft[k] || THEME_DEFAULT[k];
+  g.clearRect(0, 0, 112, 112);
+  g.fillStyle = dark(TH.bg, .04); g.fillRect(0, 0, 112, 112);
+  for (var r = 0; r < 3; r++) for (var c = 0; c < 3; c++){
+    g.fillStyle = ((c + r) & 1) ? TH.bg : dark(TH.bg, .04);
+    g.fillRect(c * s, r * s, s, s);
+    paintTile(g, sample[i++], c * s, r * s, s);
+  }
+  for (k in THEME_DEFAULT) TH[k] = saved[k];
+}
+function applyTh(t, quiet){           // 应用主题到地图：全局 TH 换掉 + 全量重画
+  for (var k in THEME_DEFAULT) TH[k] = (t && t[k]) || THEME_DEFAULT[k];
+  buildTools(); miniDirty = true; draw();
+  if (!quiet) toast('已应用主题「' + (TH.name || '未命名') + '」');
+  save();
+}
+/* ---- 参考图 → 色板：k-means（k=6，迭代 10 次；跳过近白/透明，它们是留白不是风格） ---- */
+function rgb2hsl(hex){
+  var h = String(hex || '#000').replace('#', '');
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  var n = parseInt(h, 16), r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, l = (mx + mn) / 2, s = 0, hh = 0;
+  if (d > 0.0001){
+    s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    hh = mx === r ? ((g - b) / d + (g < b ? 6 : 0)) : mx === g ? ((b - r) / d + 2) : ((r - g) / d + 4);
+    hh *= 60;
+  }
+  return { h:hh, s:s, l:l };
+}
+function extractPalette(img, k){
+  var n = 56, cv = document.createElement('canvas'); cv.width = n; cv.height = n;
+  var g = cv.getContext('2d'), d;
+  var sc = Math.min(n / img.naturalWidth, n / img.naturalHeight);
+  var w = img.naturalWidth * sc, h = img.naturalHeight * sc;
+  g.drawImage(img, (n - w) / 2, (n - h) / 2, w, h);
+  d = g.getImageData(0, 0, n, n).data;
+  var pts = [], i, r, gg, b, mx, mn;
+  for (i = 0; i < d.length; i += 4){
+    if (d[i + 3] < 200) continue;
+    r = d[i]; gg = d[i + 1]; b = d[i + 2];
+    mx = Math.max(r, gg, b); mn = Math.min(r, gg, b);
+    if (mx > 244 && mn > 238) continue;                 // 近白 = 留白，不计入
+    pts.push([r, gg, b]);
+  }
+  if (pts.length < 12){ toast('这张图没什么可提取的颜色'); return []; }
+  var cent = [pts[Math.floor(pts.length * 0.3)], pts[Math.floor(pts.length * 0.6)]];
+  while (cent.length < k) cent.push(pts[Math.floor(Math.random() * pts.length)]);
+  var it, j, c, best, bi, dist, tmp;
+  for (it = 0; it < 10; it++){
+    var groups = []; for (j = 0; j < k; j++) groups.push([]);
+    for (i = 0; i < pts.length; i++){
+      best = 1e9; bi = 0;
+      for (j = 0; j < k; j++){
+        dist = (pts[i][0] - cent[j][0]) ** 2 + (pts[i][1] - cent[j][1]) ** 2 + (pts[i][2] - cent[j][2]) ** 2;
+        if (dist < best){ best = dist; bi = j; }
+      }
+      groups[bi].push(pts[i]);
+    }
+    for (j = 0; j < k; j++){
+      if (!groups[j].length) continue;
+      tmp = [0, 0, 0];
+      for (i = 0; i < groups[j].length; i++){ tmp[0] += groups[j][i][0]; tmp[1] += groups[j][i][1]; tmp[2] += groups[j][i][2]; }
+      cent[j] = [tmp[0] / groups[j].length, tmp[1] / groups[j].length, tmp[2] / groups[j].length];
+    }
+  }
+  var out = [];
+  for (j = 0; j < k; j++){
+    if (!groups[j].length) continue;
+    c = cent[j];
+    var hx = '#' + ('00000' + ((Math.round(c[0]) << 16) | (Math.round(c[1]) << 8) | Math.round(c[2])).toString(16)).slice(-6);
+    out.push({ hex:hx, n:groups[j].length });
+  }
+  out.sort(function(a, b){ return b.n - a.n; });
+  return out;
+}
+/* ---- 色板 → 主题：亮度定骨架（最亮=背景/最暗=缝线），色相定角色（红=刺 蓝=开关…） ---- */
+function assignRoles(pal){
+  var t = {}, k;
+  for (k in THEME_DEFAULT) t[k] = TH[k];                 // 以当前主题为底，没提取到的保留
+  if (!pal || !pal.length) return t;
+  var arr = pal.map(function(p){ var hsl = rgb2hsl(p.hex); return { hex:p.hex, h:hsl.h, s:hsl.s, l:hsl.l, n:p.n }; });
+  var byL = arr.slice().sort(function(a, b2){ return a.l - b2.l; });
+  t.brickLine = byL[0].hex;                              // 最暗 → 砖缝线
+  t.bg = byL[byL.length - 1].hex;                        // 最亮 → 背景
+  var used = {}; used[byL[0].hex] = 1; used[byL[byL.length - 1].hex] = 1;
+  var rest = arr.filter(function(p){ return !used[p.hex]; });
+  var neutral = rest.filter(function(p){ return p.s < 0.28; }).sort(function(a, b2){ return b2.n - a.n; })[0]
+             || rest.slice().sort(function(a, b2){ return b2.n - a.n; })[0];
+  if (neutral){
+    t.brick = neutral.hex; t.brickTop = light(neutral.hex, .12); t.brickSide = dark(neutral.hex, .12);
+    t.bridge = dark(neutral.hex, .06);
+  }
+  var hues = {};
+  rest.forEach(function(p){
+    if (neutral && p.hex === neutral.hex) return;
+    var h = p.h;
+    if ((h < 25 || h >= 330) && !hues.spike) hues.spike = p.hex;
+    else if (h >= 25 && h < 45 && !hues.key) hues.key = p.hex;
+    else if (h >= 45 && h < 70 && p.s > 0.12 && !hues.wood) hues.wood = p.hex;
+    else if (h >= 70 && h < 170 && !hues.goal) hues.goal = p.hex;
+    else if (h >= 170 && h < 260){
+      if (p.l > 0.5){ if (!hues.switch_) hues.switch_ = p.hex; }
+      else { if (!hues.portal) hues.portal = p.hex; }
+    }
+    else if (h >= 260 && !hues.door) hues.door = p.hex;
+  });
+  for (k in hues) if (hues[k]) t[k] = hues[k];
+  return t;
+}
+function loadRefs(files){             // 读入参考图（可多张）：逐张提取 → 合并 → 分配角色
+  var list = Array.prototype.slice.call(files || []);
+  if (!list.length) return;
+  var left = list.length, all = [];
+  list.forEach(function(f){
+    var fr = new FileReader();
+    fr.onload = function(){
+      var im = new Image();
+      im.onload = function(){
+        thRefs.push(im);
+        all = all.concat(extractPalette(im, 6));
+        if (--left === 0){
+          all.sort(function(a, b){ return b.n - a.n; });
+          var top = all.slice(0, 8);
+          var box = $('thPalette'); box.innerHTML = '';
+          if (!top.length){ box.innerHTML = '<span class="hint">没提到颜色，换张图试试</span>'; return; }
+          top.forEach(function(p){
+            var sw = document.createElement('div');
+            sw.className = 'sw'; sw.style.background = p.hex; sw.title = p.hex;
+            box.appendChild(sw);
+          });
+          thDraft = assignRoles(top);
+          renderThCols(); drawThPrev();
+          toast('已从 ' + list.length + ' 张参考图提取配色，可逐项微调');
+        }
+      };
+      im.src = fr.result;
+    };
+    fr.readAsDataURL(f);
+  });
+}
+/* ---- 主题库：预设之外，用户保存的主题也存 localStorage ---- */
+function persistThemes(){
+  try { localStorage.setItem(TKEY, JSON.stringify(THEMES)); } catch (e){}
+}
+function loadThemes(){
+  try {
+    var d = JSON.parse(localStorage.getItem(TKEY) || '[]');
+    if (d && d.length) THEMES = d.filter(function(t){ return t && t.brick; });
+  } catch (e){}
+}
+function bindThUI(){
+  $('thClose').onclick = closeThMgr;
+  $('thUp').onclick = function(){ $('thFile').click(); };
+  $('thFile').onchange = function(){ loadRefs(this.files); this.value = ''; };
+  $('thApply').onclick = function(){
+    if (!thDraft) return;
+    thDraft.name = $('thName').value.trim() || thDraft.name || '自定义';
+    applyTh(thDraft); closeThMgr();
+  };
+  $('thSave').onclick = function(){
+    if (!thDraft) return;
+    thDraft.name = $('thName').value.trim() || ('主题 ' + (THEMES.length + 1));
+    var t = {}; for (var k in THEME_DEFAULT) t[k] = thDraft[k];
+    THEMES.push(t); persistThemes(); renderThList();
+    toast('已保存主题「' + t.name + '」，下次直接在左列点用');
+  };
+  $('thDel').onclick = function(){
+    var sel = $('thList').querySelector('.bitem.sel');
+    if (!sel){ toast('先在左列选中一个「我的主题」'); return; }
+    var i = +sel.dataset.mine;
+    if (isNaN(i)){ toast('预设风格不能删'); return; }
+    var nm = THEMES[i].name;
+    THEMES.splice(i, 1); persistThemes(); renderThList();
+    toast('已删除「' + nm + '」');
+  };
+  $('thList').addEventListener('click', function(e){
+    var el = e.target.closest('.bitem'); if (!el) return;
+    $('thList').querySelectorAll('.bitem').forEach(function(x){ x.classList.remove('sel'); });
+    el.classList.add('sel');
+    var t = el.dataset.pre !== undefined ? THEME_PRESETS[+el.dataset.pre] : THEMES[+el.dataset.mine];
+    if (!t) return;
+    thDraft = {}; for (var k in THEME_DEFAULT) thDraft[k] = t[k];
+    $('thName').value = t.name || '';
+    renderThCols(); drawThPrev();                       // 选中即试看（应用见右下按钮）
+  });
+}
+
+/* 存档：每步操作都会自动存（本浏览器内，关掉再打开还在）；手动「保存」只是立刻存一次并提示 */
+function stamp(){
+  var d = new Date(), p = function(n){ return n < 10 ? '0' + n : '' + n; };
+  var el = $('savedAt');
+  if (el) el.textContent = '已保存 ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function save(){
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ cols:COLS, rows:ROWS, mechs:MECHS, theme:TH,
+      rowsData:grid.map(function(r){ return r.join(''); }) }));
+    stamp();
+  } catch (e){ toast('保存失败：浏览器存储不可用'); }
+}
+/* 下载成 .txt 文本：记事本就能打开，全选复制即可发给别人 / 粘进游戏 */
+function downloadTxt(){
+  exportMap();                                   // 先按当前画布刷新数据，避免下载到旧内容
+  var name = 'map-' + COLS + 'x' + ROWS + '.txt';
+  var head = '// 延时回响 · 地图导出（' + COLS + '×' + ROWS + '，装置 ' + MECHS.length +
+             '，钥匙 ' + countKeys() + '）\n' +
+             '// 用法：整段复制，粘进游戏选关卡界面的「导入地图」即可玩\n';
+  var blob = new Blob([head + $('out').value], { type:'text/plain;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 200);
+  toast('已下载 ' + name + '（记事本打开，全选复制即可分享）');
+}
+function load(){
+  try {
+    var d = JSON.parse(localStorage.getItem(KEY));
+    if (!d || !d.rowsData) return false;
+    COLS = d.cols; ROWS = d.rows;
+    $('inCols').value = COLS; $('inRows').value = ROWS;
+    grid = []; for (var r = 0; r < ROWS; r++) grid.push((d.rowsData[r] || '').split(''));
+    MECHS = d.mechs || []; if (!MECHS.length) inferMech();
+    if (d.theme) for (var k in THEME_DEFAULT) if (d.theme[k]) TH[k] = d.theme[k];
+    return true;
+  } catch (e){ return false; }
+}
+function fit(){                                     // 缩放到整张图刚好铺满视口
+  scale = Math.max(2, Math.min(vw / COLS, vh / ROWS));
+  camX = (COLS * scale - vw) / 2; camY = (ROWS * scale - vh) / 2;
+  if (COLS * scale < vw) camX = -(vw - COLS * scale) / 2;
+  if (ROWS * scale < vh) camY = -(vh - ROWS * scale) / 2;
+}
+
+/* ---------------- 交互 ---------------- */
+cv.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+cv.addEventListener('pointerdown', function(e){
+  cv.setPointerCapture(e.pointerId);
+  if (e.button === 1 || spaceDown || panMode){      // 中键 / 空格 / 抓手模式 = 平移
+    panning = true; panSX = e.clientX; panSY = e.clientY; cv.classList.add('pan'); return;
+  }
+  var p = cellAt(e.offsetX, e.offsetY); if (!p) return;
+  var erase = (e.button === 2);
+  if (!erase && mode === 'pick'){                    // 取色：把该格设为画笔
+    var tc = grid[p.r][p.c];
+    if (tc !== '.') selectTool(tc);
+    return;
+  }
+  if (!erase && mode === 'fill'){                    // 油漆桶：同色连通区一次填满
+    stroke = []; floodFill(p.c, p.r, cur);
+    if (stroke && stroke.length){ undoStack.push(stroke); if (undoStack.length > 300) undoStack.shift(); }
+    stroke = null; renderMech(); save(); draw(); return;
+  }
+  if (!erase && mode === 'rect'){                    // 矩形：先记起点，松开时落笔
+    recting = true; rectStart = { c:p.c, r:p.r }; rectEnd = { c:p.c, r:p.r }; draw(); return;
+  }
+  painting = true; paintBtn = e.button; stroke = [];
+  put(p.c, p.r, erase ? '.' : cur);
+  draw();
+});
+cv.addEventListener('pointermove', function(e){
+  if (panning){
+    camX -= (e.clientX - panSX); camY -= (e.clientY - panSY);
+    panSX = e.clientX; panSY = e.clientY; draw(); return;
+  }
+  var p = cellAt(e.offsetX, e.offsetY);
+  var changed = (!p && hoverC >= 0) || (p && (p.c !== hoverC || p.r !== hoverR));
+  hoverC = p ? p.c : -1; hoverR = p ? p.r : -1;
+  if (recting && p){ rectEnd = { c:p.c, r:p.r }; draw(); }
+  else if (painting && p){ put(p.c, p.r, paintBtn === 2 ? '.' : cur); draw(); }
+  else if (changed) draw();
+  $('status').textContent = p
+    ? ('列 ' + p.c + ' 行 ' + p.r + '　→　游戏坐标 x=' + (p.c + 1) + ' y=' + (ROWS - p.r) + '　画笔 ' + cur + '　缩放 ' + scale.toFixed(0) + 'px')
+    : ('画笔 ' + cur + '　缩放 ' + scale.toFixed(0) + 'px　尺寸 ' + COLS + '×' + ROWS
+       + '　移动：方向键 / 抓手 / 空格拖');
+});
+cv.addEventListener('pointerup', function(e){
+  if (panning){ panning = false; cv.classList.remove('pan'); return; }
+  if (recting){                                     // 落笔：默认描边，Shift 填实
+    stroke = []; applyRect(rectStart, rectEnd, cur, e.shiftKey);
+    if (stroke && stroke.length){ undoStack.push(stroke); if (undoStack.length > 300) undoStack.shift(); }
+    stroke = null; recting = false; rectStart = null; rectEnd = null;
+    renderMech(); save(); draw(); return;
+  }
+  if (painting){
+    painting = false;
+    if (stroke && stroke.length){ undoStack.push(stroke); if (undoStack.length > 300) undoStack.shift(); }
+    stroke = null; renderMech(); save();
+  }
+});
+cv.addEventListener('wheel', function(e){
+  e.preventDefault();
+  var mx = e.offsetX, my = e.offsetY;
+  var wx = (mx + camX) / scale, wy = (my + camY) / scale;      // 鼠标下的世界坐标
+  var ns = scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15);
+  scale = Math.max(2, Math.min(64, ns));
+  camX = wx * scale - mx; camY = wy * scale - my;              // 锚定鼠标不动
+  draw();
+}, { passive:false });
+
+var spaceDown = false;
+window.addEventListener('keydown', function(e){
+  if (!$('blkModal').classList.contains('hidden') && e.key === 'Escape'){ closeBlkMgr(); return; }
+  var tg = e.target;                                  // 在输入框 / 文本框里打字时，不抢快捷键
+  if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.tagName === 'SELECT')) return;
+  if (e.code === 'Space'){ spaceDown = true; e.preventDefault(); }
+  if (e.ctrlKey && e.code === 'KeyZ'){ e.preventDefault(); undo(); return; }
+  /* 方向键平移画布（Shift 加速）——大图靠它一步一步挪，比拖更稳 */
+  var k = e.shiftKey ? Math.max(160, vw * 0.6) : Math.max(40, vw * 0.15);
+  if (e.key === 'ArrowLeft'){  camX -= k; draw(); e.preventDefault(); return; }
+  if (e.key === 'ArrowRight'){ camX += k; draw(); e.preventDefault(); return; }
+  if (e.key === 'ArrowUp'){    camY -= k; draw(); e.preventDefault(); return; }
+  if (e.key === 'ArrowDown'){  camY += k; draw(); e.preventDefault(); return; }
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  var t = TOOLS;                                               // 按键直接选工具
+  for (var i = 0; i < t.length; i++)
+    for (var j = 0; j < t[i].items.length; j++)
+      if (t[i].items[j].ch === e.key){ selectTool(e.key); return; }
+  if (e.key === '.'){ selectTool('.'); return; }
+  var mk = e.key.toLowerCase();                        // 编辑模式快捷键：F 填充 / R 矩形 / I 取色
+  if (mk === 'f'){ selectMode('fill'); return; }
+  if (mk === 'r'){ selectMode('rect'); return; }
+  if (mk === 'i'){ selectMode('pick'); return; }
+});
+window.addEventListener('keyup', function(e){ if (e.code === 'Space') spaceDown = false; });
+
+/* 尺寸 / 预设 / 按钮 */
+$('btnResize').onclick = function(){
+  var c = Math.max(2, Math.min(100, +$('inCols').value || COLS));
+  var r = Math.max(2, Math.min(100, +$('inRows').value || ROWS));
+  applySize(c, r);
+};
+document.querySelectorAll('button[data-size]').forEach(function(b){
+  b.onclick = function(){ var a = b.dataset.size.split(','); applySize(+a[0], +a[1]); };
+});
+function applySize(c, r){
+  var ng = [];
+  for (var i = 0; i < r; i++){
+    var row = [];
+    for (var j = 0; j < c; j++) row.push((grid[i] && grid[i][j]) || '.');
+    ng.push(row);
+  }
+  grid = ng; COLS = c; ROWS = r;
+  $('inCols').value = c; $('inRows').value = r;
+  undoStack = []; miniDirty = true; syncMech(); fit(); draw(); save(); toast('尺寸 ' + c + '×' + r);
+}
+$('btnUndo').onclick = undo;
+$('btnClear').onclick = function(){
+  if (!confirm('清空整张地图？')) return;
+  blankGrid(COLS, ROWS); undoStack = []; MECHS = []; miniDirty = true;
+  renderMech(); draw(); save(); toast('已清空');
+};
+$('btnFit').onclick = function(){ fit(); draw(); };
+$('btnPan').onclick = function(){                 // 抓手：左键拖即平移，再点退出
+  panMode = !panMode; this.classList.toggle('on', panMode);
+  cv.classList.toggle('pan', panMode);
+  toast(panMode ? '抓手模式：左键拖动平移（再点按钮退出）' : '已退出抓手模式');
+};
+$('btnGrid').onclick = function(){ showGrid = !showGrid; this.classList.toggle('on', showGrid); draw(); };
+$('btnNo').onclick   = function(){ showNo = !showNo; this.classList.toggle('on', showNo); draw(); };
+$('btnSave').onclick = function(){ save(); toast('已保存到本机浏览器（关掉再打开还在）'); };
+$('btnDownTxt').onclick = downloadTxt;
+/* ---- 发送到游戏：写收件箱（localStorage）+ 自动打开游戏，进游戏一键载入 ---- */
+var GKEY = 'delayed_echo_game_file';             // 记住游戏页地址（可填完整网址）
+var gameFile = '';
+try { gameFile = localStorage.getItem(GKEY) || ''; } catch (e){}
+function showGameFile(){ var el = $('gameFile'); if (el && document.activeElement !== el) el.value = gameFile; }
+showGameFile();
+/* 地址可直接编辑：游戏与编辑器分成两个仓库部署后，填完整网址即可自动打开 */
+$('gameFile').addEventListener('change', function(){
+  gameFile = this.value.trim();
+  try { localStorage.setItem(GKEY, gameFile); } catch (e){}
+  toast(gameFile ? '游戏页地址已保存：' + gameFile : '已清空游戏页地址（发送时不再自动打开）');
+});
+/* 游戏页地址：文件选择器拿不到完整路径，但 window.open 是相对编辑器所在目录解析的，
+   同目录时一个文件名就够用——所以取 name 即可（浏览器安全限制，不暴露真实路径） */
+/* 游戏页地址改为直接在上方输入框编辑（见 GKEY 处的 change 监听） */
+
+$('btnSend').onclick = function(){
+  var pkg = {
+    t: Date.now(), name: TH.name || '自定义',
+    map: grid.map(function(r){ return r.join(''); }),
+    mechs: MECHS, blocks: BLOCKS, theme: TH
+  };
+  var s;
+  try { s = JSON.stringify(pkg); } catch (e){ toast('序列化失败'); return; }
+  if (s.length > 4200000){                        // localStorage 实际约 5MB（UTF-16 双字节）
+    toast('数据太大发不出去（多半是上传图太多）——先用「下载 .txt」再粘进游戏');
+    return;
+  }
+  try { localStorage.setItem('delayed_echo_inbox', s); }
+  catch (e){ toast('浏览器存储不可用，改走「下载 .txt」粘贴'); return; }
+  if (!gameFile){                                 // 没填游戏页地址：只投递，不自动打开
+    if (lnk) lnk.hidden = true;
+    toast('已发送！在游戏里点「载入这张地图」即可');
+    return;
+  }
+  var w = null;
+  try { w = window.open(gameFile, '_blank'); } catch (e){}
+  var lnk = $('lnkGame');
+  if (w){                                          // 自动打开成功
+    if (lnk) lnk.hidden = true;
+    toast('已发送！游戏窗口已打开，进去点「载入这张地图」');
+  } else {                                         // 被拦截：给个能直接点的链接
+    if (lnk){
+      lnk.hidden = false; lnk.href = gameFile; lnk.target = '_blank';
+      lnk.textContent = '▸ 点此打开游戏';
+    }
+    toast('已发送！浏览器拦了新窗口——点上面的「点此打开游戏」链接');
+  }
+};
+$('btnExport').onclick = exportMap;
+$('btnImport').onclick = importMap;
+$('btnCopy').onclick = function(){
+  exportMap();                                   // 先按当前画布刷新数据，避免下载到旧内容
+  $('out').select();
+  try { document.execCommand('copy'); toast('已复制到剪贴板'); }
+  catch (e){ toast('请手动 Ctrl+C'); }
+};
+window.addEventListener('resize', resize);
+
+/* ---------------- 启动 ---------------- */
+loadBlocks();          // 先读图块库，工具栏里才有自定义图块
+loadThemes();          // 再读主题库
+bindBlkUI();           // 弹窗与工具栏事件只绑一次（buildTools 会重建内部 HTML）
+bindThUI();            // 主题面板同理
+buildTools();
+var restored = load();
+if (!restored) blankGrid(COLS, ROWS);
+resize(); fit(); draw(); exportMap(); renderMech();
+if (restored){ stamp(); toast('已恢复上次编辑的地图（' + COLS + '×' + ROWS + '）'); }
+else if ($('savedAt')) $('savedAt').textContent = '自动保存已开启';
+</script>
+</body>
+</html>

@@ -1231,8 +1231,39 @@ function undo(){
 }
 
 /* ---------------- 导入 / 导出 / 存档 ---------------- */
+/* 导出文本的抬头：给「拿到文件的人」看的三步说明。
+   ⚠️ 必须整段包在块注释里 —— 游戏端是 new Function(整段文本) 执行的，
+      裸文本（哪怕全是中文）也会当成代码解析，直接 SyntaxError 导入失败。
+      块注释正文里也不要写「星号紧跟斜杠」那两个字，会把注释提前截断（踩过）。 */
+function exportHead(){
+  var L = [];
+  L.push('/*');
+  L.push('────────────────────────────────────────────────────');
+  L.push('   延时回响 · 自制地图（' + COLS + ' x ' + ROWS + '）');
+  L.push('────────────────────────────────────────────────────');
+  L.push('');
+  L.push('【怎么玩】三步');
+  L.push('  1. 用浏览器打开');
+  L.push('     https://zzt970.github.io/delayed-echo-game/');
+  L.push('  2. 点「开始游戏」→ 选关页最下面「导入地图」→ 会弹出一个输入框');
+  L.push('  3. Ctrl+A 全选本文件 → Ctrl+C 复制 → 粘进那个框 → 点「开始玩」');
+  L.push('');
+  L.push('【想改这张图】');
+  L.push('  地图编辑器  https://zzt970.github.io/delayed-echo-editor/');
+  L.push('  在编辑器里改完，再点「下载 .txt」，就得到一份新的。');
+  L.push('');
+  L.push('【下面别改】');
+  L.push('  从 var MAP 开始是地图数据。整段复制，一个字符都不要增删，');
+  L.push('  否则游戏会提示「解析不出地图」。');
+  L.push('────────────────────────────────────────────────────');
+  L.push('*/');
+  L.push('');
+  L.push('// ===== 以下是地图数据（整段复制，别改）=====');
+  return L;
+}
 function exportMap(){
-  var lines = ['var MAP = ['];
+  var lines = exportHead();
+  lines.push('var MAP = [');
   for (var r = 0; r < ROWS; r++)
     lines.push("  '" + grid[r].join('') + "', // " + r + '  y=' + (ROWS - r));
   lines.push('];');
@@ -1267,7 +1298,9 @@ function exportMap(){
   lines.push('// 开关 bind 可填：木板 E# / 传送门 P# / door（机关门）');
   lines.push('');
   lines.push('// 地图风格（主题）：整段粘到 LEVELS 定义之前；不贴则游戏用默认米白');
-  lines.push('var THEME = { name:' + escAttr(TH.name || '自定义') + ',');
+  /* ⚠️ name 必须包单引号：漏了会导出成 name:米白 —— 整段文本执行时 ReferenceError，
+     游戏导入直接失败（「没解析出地图」）。别照抄下面那段循环的拼法。 */
+  lines.push("var THEME = { name:'" + escAttr(TH.name || '自定义') + "',");
   THEME_KEYS.forEach(function(pair, i){
     lines.push('  ' + pair[0] + ":'" + TH[pair[0]] + "'" + (i < THEME_KEYS.length - 1 ? ',' : ''));
   });
@@ -1618,14 +1651,13 @@ function save(){
     stamp();
   } catch (e){ toast('保存失败：浏览器存储不可用'); }
 }
-/* 下载成 .txt 文本：记事本就能打开，全选复制即可发给别人 / 粘进游戏 */
+/* 下载成 .txt 文本：记事本就能打开，全选复制即可发给别人 / 粘进游戏。
+   抬头那套「怎么玩」三步说明由 exportMap → exportHead 统一生成，这里不要再加，
+   否则下载的文件里会出现两份说明。 */
 function downloadTxt(){
   exportMap();                                   // 先按当前画布刷新数据，避免下载到旧内容
   var name = 'map-' + COLS + 'x' + ROWS + '.txt';
-  var head = '// 延时回响 · 地图导出（' + COLS + '×' + ROWS + '，装置 ' + MECHS.length +
-             '，钥匙 ' + countKeys() + '）\n' +
-             '// 用法：整段复制，粘进游戏选关卡界面的「导入地图」即可玩\n';
-  var blob = new Blob([head + $('out').value], { type:'text/plain;charset=utf-8' });
+  var blob = new Blob([$('out').value], { type:'text/plain;charset=utf-8' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;

@@ -165,7 +165,13 @@
   <div class="grp">
     <button id="btnSave">保存</button>
     <button id="btnDownTxt" title="下载成 .txt 文本：用记事本就能打开，直接全选复制发给别人">下载 .txt（复制分享）</button>
-    <button id="btnSend" class="pri" title="把当前地图+主题+贴纸写进收件箱，并自动打开游戏，进游戏一键载入">发送到游戏 ▶</button>
+    <button id="btnSend" class="pri" title="把当前地图+主题+贴纸写进收件箱，并自动打开游戏；游戏里会存进「我的地图」存档位">发送到游戏 ▶</button>
+    <select id="slotSel" title="发到游戏里的哪个存档位：自动 = 放进第一个空格；指定则覆盖那一格" style="font-size:11.5px;padding:3px 4px;border:1px solid #d8dee4;border-radius:4px;background:#fff">
+      <option value="-1">存档位：自动</option>
+      <option value="0">存档位 ①</option>
+      <option value="1">存档位 ②</option>
+      <option value="2">存档位 ③</option>
+    </select>
     <span class="hint" title="游戏网页的地址。部署后填完整网址（如 https://xxx.github.io/delayed-echo-game/），本地可填 ../delayed-echo-game/index.html；发送时会自动打开它">游戏页</span>
     <input id="gameFile" type="text" spellcheck="false" style="width:280px;font-size:11.5px;padding:3px 6px;border:1px solid #d8dee4;border-radius:4px;background:#fff" placeholder="游戏网页地址（留空则不自动打开）">
     <a id="lnkGame" class="hint" hidden title="浏览器拦截了新窗口，点这里手动打开游戏"></a>
@@ -1790,12 +1796,25 @@ $('gameFile').addEventListener('change', function(){
    同目录时一个文件名就够用——所以取 name 即可（浏览器安全限制，不暴露真实路径） */
 /* 游戏页地址改为直接在上方输入框编辑（见 GKEY 处的 change 监听） */
 
+/* 存档位偏好：-1 = 自动（游戏里找第一个空位）；0/1/2 = 指定覆盖那一格 */
+var SKEY = 'delayed_echo_slot_pref';
+(function(){
+  var el = $('slotSel'); if (!el) return;
+  try { var v = localStorage.getItem(SKEY); if (v !== null) el.value = v; } catch (e){}
+  el.addEventListener('change', function(){
+    try { localStorage.setItem(SKEY, el.value); } catch (e){}
+    toast(el.value === '-1' ? '发送时自动放进第一个空存档位' : '发送时会覆盖「存档位 ' + ['①','②','③'][+el.value] + '」');
+  });
+})();
 $('btnSend').onclick = function(){
+  var slotPref = -1;
+  try { slotPref = parseInt($('slotSel').value, 10); } catch (e){}
   var pkg = {
     t: Date.now(), name: TH.name || '自定义',
     map: grid.map(function(r){ return r.join(''); }),
     mechs: MECHS, blocks: BLOCKS, theme: TH
   };
+  if (slotPref >= 0) pkg.slot = slotPref;          // 不指定 = 游戏端自己找空位
   var s;
   try { s = JSON.stringify(pkg); } catch (e){ toast('序列化失败'); return; }
   if (s.length > 4200000){                        // localStorage 实际约 5MB（UTF-16 双字节）
@@ -1806,7 +1825,7 @@ $('btnSend').onclick = function(){
   catch (e){ toast('浏览器存储不可用，改走「下载 .txt」粘贴'); return; }
   if (!gameFile){                                 // 没填游戏页地址：只投递，不自动打开
     if (lnk) lnk.hidden = true;
-    toast('已发送！在游戏里点「载入这张地图」即可');
+    toast('已发送！打开游戏就会自动存进「我的地图」存档位');
     return;
   }
   var w = null;
@@ -1814,7 +1833,7 @@ $('btnSend').onclick = function(){
   var lnk = $('lnkGame');
   if (w){                                          // 自动打开成功
     if (lnk) lnk.hidden = true;
-    toast('已发送！游戏窗口已打开，进去点「载入这张地图」');
+    toast('已发送！游戏窗口已打开，地图会自动存进「我的地图」存档位');
   } else {                                         // 被拦截：给个能直接点的链接
     if (lnk){
       lnk.hidden = false; lnk.href = gameFile; lnk.target = '_blank';
